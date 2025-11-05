@@ -10,7 +10,9 @@ import '../widgets/stats_cards.dart';
 import '../widgets/questionnaire_list.dart';
 import '../services/local_storage_service.dart';
 import '../models/form_response.dart';
+import '../models/question_response.dart';
 import 'questionnaire_preview_screen.dart';
+import 'question_screen.dart';
 import 'profile_screen.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
@@ -185,6 +187,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 children: [
                                   _buildWelcomeCard(user),
                                   const SizedBox(height: 20),
+                                  _buildPendingFormsCard(),
+                                  const SizedBox(height: 20),
                                   _buildManagementOptions(context),
                                   const SizedBox(height: 20),
                                   _buildQuickStats(),
@@ -201,10 +205,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               child: Column(
                                 children: [
                                   const SyncStatusCard(),
-                                 
-                                 /* const SizedBox(height: 10),
-                                  _buildDebugButtons(), */
 
+                                  /* const SizedBox(height: 10),
+                                  _buildDebugButtons(), */
                                   const SizedBox(height: 20),
                                   // Card de Formulários Pendentes
                                   _buildPendingFormsCard(),
@@ -538,31 +541,68 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               listen: false,
                             );
 
-                            final formsResult = await formProvider.syncPendingForms();
-    
-                           // final photosResult = await formProvider.syncPendingPhotosOnly();
+                            print('📱 === INICIANDO SINCRONIZAÇÃO DA DASHBOARD ===');
+
+                            final formsResult = await formProvider
+                                .syncPendingForms();
+
+                            print('📱 Resultado da sincronização: $formsResult itens');
 
                             await _loadPendingForms();
 
                             if (mounted) {
+                              String message;
+                              Color color;
+
+                              if (formsResult > 0) {
+                                message = 'Sincronização concluída! $formsResult ${formsResult == 1 ? 'item sincronizado' : 'itens sincronizados'}';
+                                color = Colors.green;
+                              } else {
+                                message = 'Nenhum item foi sincronizado. Verifique sua conexão com a internet.';
+                                color = Colors.orange;
+                              }
+
+                              print('📱 Mostrando mensagem: $message (cor: ${formsResult > 0 ? 'verde' : 'laranja'})');
+
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: const Text(
-                                     'Sincronização concluída!',
-                                  ),
-                                  backgroundColor: formsResult > 0
-                                      ? Colors.green
-                                      : Colors.orange,
+                                  content: Text(message),
+                                  backgroundColor: color,
+                                  duration: const Duration(seconds: 4),
                                 ),
                               );
                             }
                           } catch (e) {
                             print('❌ Erro na sincronização: $e');
+
+                            // Verificar se é erro de token inválido
+                            final isTokenError = e.toString().contains('Invalid token') ||
+                                                 e.toString().contains('Token expirado') ||
+                                                 e.toString().contains('401');
+
                             if (mounted) {
+                              String errorMessage;
+
+                              if (isTokenError) {
+                                errorMessage = 'Sessão expirada. Faça login novamente para sincronizar.';
+                              } else {
+                                errorMessage = 'Erro na sincronização: ${e.toString().replaceAll('Exception: ', '')}';
+                              }
+
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Erro na sincronização: $e'),
+                                  content: Text(errorMessage),
                                   backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 5),
+                                  action: isTokenError
+                                      ? SnackBarAction(
+                                          label: 'LOGIN',
+                                          textColor: Colors.white,
+                                          onPressed: () {
+                                            Navigator.of(context).pushReplacementNamed('/login');
+                                          },
+                                        )
+                                      : null,
                                 ),
                               );
                             }
@@ -857,6 +897,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
           ),
+          // Botão de editar
+          IconButton(
+            icon: Icon(
+              Icons.edit_outlined,
+              size: 18,
+              color: Colors.blue.shade600,
+            ),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () => _editPendingForm(form),
+            tooltip: 'Editar questionário',
+          ),
+          const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
@@ -950,6 +1003,103 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
     );
+  }
+
+  /// Editar questionário pendente antes de submeter
+  Future<void> _editPendingForm(FormResponse form) async {
+    try {
+      print('✏️ === EDITANDO QUESTIONÁRIO PENDENTE ===');
+      print('📋 Questionário ID: ${form.questionnaireId}');
+      print('📝 Respostas atuais: ${form.responses.length}');
+      print('🆔 Form ID: ${form.id}');
+
+      // Buscar o questionário completo
+      final questionnaireProvider = Provider.of<QuestionnaireProvider>(
+        context,
+        listen: false,
+      );
+
+      await questionnaireProvider.loadQuestionnaires();
+
+      final questionnaire = questionnaireProvider.questionnaires.firstWhere(
+        (q) => q.id == form.questionnaireId,
+        orElse: () => throw Exception('Questionário não encontrado'),
+      );
+
+      print('✅ Questionário encontrado: ${questionnaire.title}');
+
+      // Carregar respostas existentes no FormProvider
+      final formProvider = Provider.of<FormProvider>(context, listen: false);
+
+      print('📝 === INICIANDO EDIÇÃO DE FORMULÁRIO ===');
+      print('📝 ID do formulário: ${form.id}');
+      print('📝 Questionário ID: ${form.questionnaireId}');
+      print('📝 Número de respostas: ${form.responses.length}');
+
+      // Converter List<QuestionResponse> para Map<int, QuestionResponse>
+      final responsesMap = <int, QuestionResponse>{};
+      for (final response in form.responses) {
+        responsesMap[response.questionId] = response;
+      }
+
+      // Carregar as respostas existentes
+      formProvider.loadExistingResponses(responsesMap);
+
+      // Definir que estamos em modo de edição
+      if (form.id != null) {
+        formProvider.setEditMode(form.id.toString());
+        print('✅ Modo de edição ativado com ID: ${form.id}');
+      } else {
+        print('❌ ERRO: Formulário sem ID não pode ser editado');
+        return;
+      }
+
+      // Navegar para a tela de questões
+      if (!mounted) return;
+
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => QuestionScreen(
+            questionnaire: questionnaire,
+            currentQuestionIndex: 0,
+          ),
+        ),
+      );
+
+      // Limpar modo de edição
+      formProvider.clearEditMode();
+
+      // Se o usuário completou o questionário, recarregar a lista
+      if (result == true) {
+        print('✅ Questionário editado com sucesso');
+        await _loadPendingForms();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Questionário editado com sucesso!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        print('ℹ️ Edição cancelada pelo usuário');
+      }
+    } catch (e) {
+      print('❌ Erro ao editar questionário: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao carregar questionário: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _syncPendingForms() async {

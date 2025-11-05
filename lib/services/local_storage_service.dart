@@ -25,21 +25,69 @@ class LocalStorageService {
 
   static Future<List<Questionnaire>> getQuestionnaires() async {
     try {
-      print('📖 Carregando questionários do storage local');
+      print('📖 === CARREGANDO QUESTIONÁRIOS DO STORAGE LOCAL ===');
       final prefs = await SharedPreferences.getInstance();
       final jsonString = prefs.getString(_questionnairesKey);
-      
+
       if (jsonString == null) {
         print('⚠️ Nenhum questionário encontrado no storage local');
         return [];
       }
-      
+
+      print('📋 JSON encontrado com ${jsonString.length} caracteres');
+
       final jsonList = jsonDecode(jsonString) as List<dynamic>;
-      final questionnaires = jsonList
-          .map((json) => Questionnaire.fromJson(json as Map<String, dynamic>))
-          .toList();
-      
-      print('✅ ${questionnaires.length} questionários carregados do storage local');
+      print('📋 Lista JSON decodificada com ${jsonList.length} questionários');
+
+      final questionnaires = <Questionnaire>[];
+      for (int i = 0; i < jsonList.length; i++) {
+        try {
+          final json = jsonList[i] as Map<String, dynamic>;
+          print('📋 Processando questionário $i: ${json['title']}');
+
+          // Debug: verificar se as questões existem
+          if (json['questions'] != null) {
+            final questions = json['questions'] as List;
+            print('   - ${questions.length} questões encontradas');
+
+            // Debug: verificar opções da primeira questão se existir
+            if (questions.isNotEmpty) {
+              final firstQuestion = questions[0] as Map<String, dynamic>;
+              print('   - Primeira questão: ${firstQuestion['question_text']}');
+              print('   - Tipo: ${firstQuestion['question_type']}');
+
+              if (firstQuestion['options'] != null) {
+                final options = firstQuestion['options'] as List;
+                print('   - Opções encontradas: ${options.length}');
+
+                if (options.isNotEmpty) {
+                  print('   - Primeira opção: ${options[0]}');
+                }
+              } else {
+                print('   - ⚠️ NENHUMA OPÇÃO ENCONTRADA NA PRIMEIRA QUESTÃO!');
+              }
+            }
+          } else {
+            print('   - ⚠️ NENHUMA QUESTÃO ENCONTRADA!');
+          }
+
+          final questionnaire = Questionnaire.fromJson(json);
+          questionnaires.add(questionnaire);
+          print('✅ Questionário $i carregado com ${questionnaire.questions.length} questões');
+
+          // Debug adicional: verificar opções após parsing
+          if (questionnaire.questions.isNotEmpty) {
+            final firstQ = questionnaire.questions[0];
+            print('   - Após parsing: ${firstQ.options.length} opções na primeira questão');
+          }
+
+        } catch (e, stackTrace) {
+          print('❌ Erro ao processar questionário $i: $e');
+          print('📋 Stack trace: $stackTrace');
+        }
+      }
+
+      print('✅ === ${questionnaires.length} QUESTIONÁRIOS CARREGADOS COM SUCESSO ===');
       return questionnaires;
     } catch (e, stackTrace) {
       print('❌ Erro ao carregar questionários do storage local: $e');
@@ -92,20 +140,35 @@ class LocalStorageService {
       }
       
       // Verificar se já existe um formulário com o mesmo ID
+      print('🔍 === VERIFICANDO DUPLICAÇÃO ===');
+      print('🔍 Formulário sendo salvo - ID: ${formWithId.id} (tipo: ${formWithId.id.runtimeType})');
+      print('🔍 Total de formulários existentes: ${existingForms.length}');
+
+      // Listar todos os IDs existentes para comparação
+      for (int i = 0; i < existingForms.length; i++) {
+        print('🔍 Formulário existente[$i] - ID: ${existingForms[i].id} (tipo: ${existingForms[i].id.runtimeType})');
+      }
+
       bool formExists = false;
       for (int i = 0; i < existingForms.length; i++) {
+        print('🔍 Comparando: ${existingForms[i].id} == ${formWithId.id} ?');
         if (existingForms[i].id == formWithId.id) {
-          print('🔄 Atualizando formulário existente com ID: ${formWithId.id}');
+          print('🔄 ✅ MATCH ENCONTRADO! Atualizando formulário existente com ID: ${formWithId.id}');
           existingForms[i] = formWithId;
           formExists = true;
           break;
+        } else {
+          print('🔍 ❌ Não é igual (${existingForms[i].id} != ${formWithId.id})');
         }
       }
-      
+
       // Se não existe, adicionar à lista
       if (!formExists) {
-        print('➕ Adicionando novo formulário à lista');
+        print('➕ ⚠️ NENHUM MATCH ENCONTRADO - Adicionando novo formulário à lista');
+        print('➕ ID do novo formulário: ${formWithId.id}');
         existingForms.add(formWithId);
+      } else {
+        print('🔄 ✅ FORMULÁRIO FOI SUBSTITUÍDO, NÃO ADICIONADO');
       }
       
       print('📋 Total de formulários para salvar: ${existingForms.length}');
@@ -211,10 +274,10 @@ class LocalStorageService {
       print('🔄 === ATUALIZANDO STATUS DE SINCRONIZAÇÃO ===');
       print('📋 Form ID: $formId');
       print('📋 Novo status: $status');
-      
+
       List<FormResponse> forms = await getFormResponses();
       print('📋 ${forms.length} formulários carregados para atualização');
-      
+
       bool formFound = false;
       for (int i = 0; i < forms.length; i++) {
         if (forms[i].id == formId) {
@@ -224,29 +287,102 @@ class LocalStorageService {
           break;
         }
       }
-      
+
       if (!formFound) {
         print('❌ Formulário com ID $formId não encontrado');
         throw Exception('Formulário não encontrado');
       }
-      
+
       final prefs = await SharedPreferences.getInstance();
       final jsonList = forms.map((f) => f.toJson()).toList();
       final jsonString = jsonEncode(jsonList);
       final result = await prefs.setString(_formsKey, jsonString);
-      
+
       if (result) {
         print('✅ === STATUS ATUALIZADO COM SUCESSO ===');
       } else {
         print('❌ Falha ao salvar status atualizado');
         throw Exception('Falha ao salvar');
       }
-      
+
     } catch (e, stackTrace) {
       print('❌ === ERRO DURANTE ATUALIZAÇÃO DE STATUS ===');
       print('❌ Erro: $e');
       print('📋 Stack trace: $stackTrace');
       rethrow;
+    }
+  }
+
+  /// Atualizar um formulário existente
+  static Future<void> updateFormResponse(FormResponse form) async {
+    try {
+      print('🔄 === ATUALIZANDO FORMULÁRIO ===');
+      print('📋 Form ID: ${form.id}');
+
+      if (form.id == null) {
+        throw Exception('Formulário sem ID não pode ser atualizado');
+      }
+
+      List<FormResponse> forms = await getFormResponses();
+      print('📋 ${forms.length} formulários carregados');
+
+      bool formFound = false;
+      for (int i = 0; i < forms.length; i++) {
+        if (forms[i].id == form.id) {
+          print('✅ Formulário encontrado na posição $i - atualizando');
+          forms[i] = form;
+          formFound = true;
+          break;
+        }
+      }
+
+      if (!formFound) {
+        print('❌ Formulário com ID ${form.id} não encontrado');
+        throw Exception('Formulário não encontrado');
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = forms.map((f) => f.toJson()).toList();
+      final jsonString = jsonEncode(jsonList);
+      final result = await prefs.setString(_formsKey, jsonString);
+
+      if (result) {
+        print('✅ === FORMULÁRIO ATUALIZADO COM SUCESSO ===');
+      } else {
+        print('❌ Falha ao salvar formulário atualizado');
+        throw Exception('Falha ao salvar');
+      }
+
+    } catch (e, stackTrace) {
+      print('❌ === ERRO DURANTE ATUALIZAÇÃO DE FORMULÁRIO ===');
+      print('❌ Erro: $e');
+      print('📋 Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Obter um formulário específico por ID
+  static Future<FormResponse?> getFormResponseById(int formId) async {
+    try {
+      print('🔍 === BUSCANDO FORMULÁRIO POR ID ===');
+      print('📋 Form ID: $formId');
+
+      final forms = await getFormResponses();
+
+      for (var form in forms) {
+        if (form.id == formId) {
+          print('✅ Formulário encontrado');
+          return form;
+        }
+      }
+
+      print('⚠️ Formulário não encontrado');
+      return null;
+
+    } catch (e, stackTrace) {
+      print('❌ Erro ao buscar formulário: $e');
+      print('📋 Stack trace: $stackTrace');
+      return null;
     }
   }
 

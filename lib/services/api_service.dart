@@ -89,13 +89,19 @@ class ApiService {
 
   static Future<Map<String, dynamic>> submitForm(FormResponse form) async {
     try {
+      final formJson = form.toJson();
+
+      // Debug: verificar se photo_path_2 está sendo enviado
+      print('📤 === ENVIANDO FORMULÁRIO PARA API ===');
+      print('📸 photo_path: ${formJson['photo_path']}');
+      print('📸 photo_path_2: ${formJson['photo_path_2']}');
+      print('📋 JSON completo: ${jsonEncode(formJson)}');
+
       final response = await http.post(
         Uri.parse('$baseUrl/forms/submit'),
         headers: await _getHeaders(),
-        body: jsonEncode(form.toJson()),
+        body: jsonEncode(formJson),
       );
-
-      print('aqui LEO');
 
       final responseData = jsonDecode(response.body);
 

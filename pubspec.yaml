@@ -72,9 +72,12 @@ dependencies:
   
   # UUID generation
   uuid: ^4.1.0
-  
+
   # Package information
   package_info_plus: ^4.2.0
+
+  # Cryptography for password hashing
+  crypto: ^3.0.3
 
   # Para gráficos
   fl_chart: ^0.66.0
@@ -88,11 +91,14 @@ dependencies:
   # ESSENCIAIS para fotos offline:
   path_provider: ^2.1.1          # Para obter diretórios do sistema
 
-  excel: ^2.0.4
+  excel: ^4.0.6
 
   pdf: ^3.10.4
 
   share_plus: ^7.2.1
+
+  # Para download de arquivos na web
+  web: ^1.1.0
 
 flutter_launcher_icons:
   android: "launcher_icon"

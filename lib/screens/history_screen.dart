@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/history_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/form_provider.dart';
+import '../services/local_storage_service.dart';
+import 'question_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -51,25 +54,52 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    await _historyProvider.loadHistory(
-      userId: _authProvider.user?.id,
-      refresh: true,
-    );
+    final userId = _authProvider.user?.id;
+    print('🚀 Carregando dados iniciais para usuário: $userId');
+    
+    if (userId != null) {
+      await _historyProvider.loadHistory(
+        userId: userId,
+        refresh: true,
+      );
+      
+      // Debug do estado após carregar
+      _historyProvider.debugPrintCurrentState();
+    } else {
+      print('❌ Erro: Usuário não está logado');
+      setState(() {
+        // Pode definir um erro específico aqui se necessário
+      });
+    }
   }
 
   Future<void> _onFilterChanged(String displayFilter) async {
     final apiFilter = _filterMapping[displayFilter] ?? 'all';
-    await _historyProvider.setFilter(
-      apiFilter,
-      userId: _authProvider.user?.id,
-    );
+    final userId = _authProvider.user?.id;
+    
+    print('🔄 Mudando filtro para: $displayFilter (API: $apiFilter)');
+    
+    if (userId != null) {
+      await _historyProvider.setFilter(
+        apiFilter,
+        userId: userId,
+      );
+      
+      // Debug após mudança de filtro
+      _historyProvider.debugPrintCurrentState();
+    }
   }
 
   Future<void> _onRefresh() async {
-    await _historyProvider.loadHistory(
-      userId: _authProvider.user?.id,
-      refresh: true,
-    );
+    final userId = _authProvider.user?.id;
+    print('🔄 Atualizando dados...');
+    
+    if (userId != null) {
+      await _historyProvider.loadHistory(
+        userId: userId,
+        refresh: true,
+      );
+    }
   }
 
   @override
@@ -108,15 +138,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     builder: (context, historyProvider, child) {
                       return IconButton(
                         onPressed: historyProvider.isLoading ? null : _onRefresh,
-                        icon: AnimatedRotation(
-                          turns: historyProvider.isLoading ? 1 : 0,
-                          duration: const Duration(seconds: 1),
-                          child: const Icon(
-                            Icons.refresh,
-                            color: Color(0xFF8fae5d),
-                            size: 24,
-                          ),
-                        ),
+                        icon: historyProvider.isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8fae5d)),
+                                ),
+                              )
+                            : const Icon(
+                                Icons.refresh,
+                                color: Color(0xFF8fae5d),
+                                size: 24,
+                              ),
                       );
                     },
                   ),
@@ -129,21 +164,47 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Histórico',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF23345F),
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    const Text(
-                      'Formulários aplicados',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Histórico',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF23345F),
+                              ),
+                            ),
+                            SizedBox(height: 5),
+                            Text(
+                              'Formulários aplicados',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // Debug button - remover em produção
+                        Consumer<HistoryProvider>(
+                          builder: (context, historyProvider, child) {
+                            return IconButton(
+                              onPressed: () {
+                                historyProvider.debugPrintCurrentState();
+                                print('👤 Usuário logado: ${_authProvider.user?.id}');
+                              },
+                              icon: const Icon(
+                                Icons.bug_report,
+                                color: Colors.grey,
+                                size: 16,
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 20),
                     
@@ -153,6 +214,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     Expanded(
                       child: RefreshIndicator(
                         onRefresh: _onRefresh,
+                        color: const Color(0xFF8fae5d),
                         child: _buildFormsList(),
                       ),
                     ),
@@ -214,6 +276,39 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildFormsList() {
     return Consumer<HistoryProvider>(
       builder: (context, historyProvider, child) {
+        // Verificar se o usuário está logado
+        if (_authProvider.user?.id == null) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.account_circle_outlined,
+                  size: 64,
+                  color: Colors.grey,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Erro de autenticação',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Faça login novamente',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
         if (historyProvider.isLoading && historyProvider.applications.isEmpty) {
           return const Center(
             child: Column(
@@ -244,21 +339,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  historyProvider.error!,
+                  'Erro ao carregar dados',
                   style: const TextStyle(
                     color: Colors.red,
                     fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  historyProvider.error!,
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 14,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
-                ElevatedButton(
+                ElevatedButton.icon(
                   onPressed: _loadInitialData,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Tentar novamente'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF8fae5d),
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text('Tentar novamente'),
                 ),
               ],
             ),
@@ -268,25 +373,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
         final applications = historyProvider.applications;
         
         if (applications.isEmpty) {
-          return const Center(
+          return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
+                const Icon(
                   Icons.assignment_outlined,
                   size: 64,
                   color: Colors.grey,
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Text(
-                  'Nenhum formulário encontrado',
-                  style: TextStyle(
+                  _getEmptyStateMessage(historyProvider.selectedFilter),
+                  style: const TextStyle(
                     color: Colors.grey,
                     fontSize: 16,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-                SizedBox(height: 8),
-                Text(
+                const SizedBox(height: 8),
+                const Text(
                   'Puxe para baixo para atualizar',
                   style: TextStyle(
                     color: Colors.grey,
@@ -336,6 +442,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
         );
       },
     );
+  }
+
+  String _getEmptyStateMessage(String filter) {
+    switch (filter) {
+      case 'today':
+        return 'Nenhum formulário aplicado hoje';
+      case 'week':
+        return 'Nenhum formulário aplicado esta semana';
+      case 'pending':
+        return 'Nenhum formulário pendente de sincronização';
+      default:
+        return 'Nenhum formulário encontrado';
+    }
   }
 
   Widget _buildFormItem(ApplicationHistory application, bool isLast) {
@@ -489,7 +608,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -505,6 +624,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
                   ),
                 ),
+                // Botão de editar
+                IconButton(
+                  onPressed: () => _onEditApplication(application),
+                  icon: const Icon(
+                    Icons.edit,
+                    color: Color(0xFF8fae5d),
+                  ),
+                  tooltip: 'Editar questionário',
+                ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
@@ -512,7 +640,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ],
             ),
           ),
-          
+
           const Divider(height: 1),
           
           // Conteúdo
@@ -725,6 +853,112 @@ class _HistoryScreenState extends State<HistoryScreen> {
           return const Color(0xFF2196F3);
         default:
           return Colors.grey;
+      }
+    }
+  }
+
+  /// Método para editar uma aplicação
+  Future<void> _onEditApplication(ApplicationHistory application) async {
+    print('📝 === INICIANDO EDIÇÃO DE APLICAÇÃO ===');
+    print('📋 Application ID: ${application.id}');
+    print('📋 Questionário: ${application.questionnaire.title}');
+
+    // Fechar o modal de detalhes
+    Navigator.pop(context);
+
+    // Mostrar indicador de carregamento
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8fae5d)),
+                ),
+                SizedBox(height: 16),
+                Text('Carregando questionário...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      // Carregar o formulário completo do storage local
+      final formResponse = await LocalStorageService.getFormResponseById(
+        application.id,
+      );
+
+      if (formResponse == null) {
+        // Fechar indicador de carregamento
+        if (mounted) Navigator.pop(context);
+
+        // Mostrar erro
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Formulário não encontrado localmente'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Carregar questionário do storage local
+      final questionnaires = await LocalStorageService.getQuestionnaires();
+      final questionnaire = questionnaires.firstWhere(
+        (q) => q.id == application.questionnaire.id,
+        orElse: () => throw Exception('Questionário não encontrado'),
+      );
+
+      // Fechar indicador de carregamento
+      if (mounted) Navigator.pop(context);
+
+      // Obter o FormProvider
+      final formProvider = context.read<FormProvider>();
+
+      // Carregar o formulário para edição no FormProvider
+      formProvider.loadFormForEdit(formResponse, questionnaire);
+
+      // Navegar para a tela de questões em modo de edição
+      if (mounted) {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => QuestionScreen(
+              questionnaire: questionnaire,
+              currentQuestionIndex: 0,
+            ),
+          ),
+        );
+
+        // Se o formulário foi editado e salvo, recarregar o histórico
+        if (result == true && mounted) {
+          await _onRefresh();
+        }
+      }
+    } catch (e, stackTrace) {
+      print('❌ Erro ao carregar formulário para edição: $e');
+      print('📋 Stack trace: $stackTrace');
+
+      // Fechar indicador de carregamento
+      if (mounted) Navigator.pop(context);
+
+      // Mostrar erro
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao carregar formulário: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }

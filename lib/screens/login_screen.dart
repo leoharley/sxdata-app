@@ -145,9 +145,33 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                       ),
 
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 20),
+
+                      // Botão de debug (temporário)
+                      Consumer<AuthProvider>(
+                        builder: (context, authProvider, child) {
+                          return TextButton(
+                            onPressed: () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              await authProvider.debugOfflineCredentials();
+                              messenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text('Veja o console para detalhes das credenciais'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              'Debug Credenciais Offline',
+                              style: TextStyle(fontSize: 10, color: Colors.grey),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 10),
                       const Text(
-                        'Versão: 1.9.0',
+                        'Versão: 1.9.8',
                         style: TextStyle(
                           fontSize: 12,
                           color: Color.fromARGB(255, 145, 145, 145),

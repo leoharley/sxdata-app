@@ -19,6 +19,7 @@ class PhotoCaptureScreen extends StatefulWidget {
 
 class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
   File? _capturedPhoto;
+  File? _capturedPhoto2; // Segunda foto
   Position? _currentPosition;
   bool _isLoadingLocation = false;
   bool _isNavigating = false;
@@ -109,12 +110,31 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
                             const SizedBox(height: 30),
                             
                             _buildPhotoCapture(),
-                            
+
                             if (_capturedPhoto != null) ...[
                               const SizedBox(height: 20),
                               _buildCapturedPhoto(),
                             ],
-                            
+
+                            // Segunda foto (opcional)
+                            const SizedBox(height: 20),
+                            const Text(
+                              'Evidência Fotográfica 2 (Opcional)',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF23345F),
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 10),
+                            _buildPhotoCapture2(),
+
+                            if (_capturedPhoto2 != null) ...[
+                              const SizedBox(height: 20),
+                              _buildCapturedPhoto2(),
+                            ],
+
                             if (widget.questionnaire.requiresLocation) ...[
                               const SizedBox(height: 20),
                               _buildLocationSection(),
@@ -181,6 +201,53 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
     );
   }
 
+  Widget _buildPhotoCapture2() {
+    return GestureDetector(
+      onTap: _capturePhoto2,
+      child: Container(
+        height: 150,
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: const Color(0xFF8fae5d),
+            width: 2,
+            style: BorderStyle.solid,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          color: const Color(0xFFF8FAF6),
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.camera_alt,
+                size: 60,
+                color: Color(0xFF8fae5d),
+              ),
+              SizedBox(height: 15),
+              Text(
+                'Toque para capturar segunda foto',
+                style: TextStyle(
+                  color: Color(0xFF8fae5d),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: 10),
+              Text(
+                'Foto adicional para evidência (opcional)',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildCapturedPhoto() {
     return Container(
       padding: const EdgeInsets.all(15),
@@ -226,6 +293,71 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
           const SizedBox(height: 8),
           Text(
             'IMG_${DateTime.now().millisecondsSinceEpoch}.jpg • ${(_capturedPhoto!.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB',
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCapturedPhoto2() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Color(0xFF8fae5d), size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    '📋 Segunda foto capturada:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF23345F),
+                    ),
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Color(0xFF8fae5d)),
+                onPressed: _retakePhoto2,
+                tooltip: 'Refazer foto 2',
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            height: 120,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              image: DecorationImage(
+                image: FileImage(_capturedPhoto2!),
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'IMG2_${DateTime.now().millisecondsSinceEpoch}.jpg • ${(_capturedPhoto2!.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB',
             style: const TextStyle(
               color: Colors.grey,
               fontSize: 12,
@@ -477,6 +609,70 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
     });
   }
 
+  Future<void> _capturePhoto2() async {
+    print('📸 Tentando capturar segunda foto');
+
+    try {
+      final permission = await Permission.camera.request();
+      print('📸 Permissão de câmera: $permission');
+
+      if (permission.isGranted) {
+        final XFile? photo = await _picker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 80,
+        );
+
+        if (photo != null) {
+          print('📸 Segunda foto capturada: ${photo.path}');
+          setState(() {
+            _capturedPhoto2 = File(photo.path);
+          });
+
+          if (!mounted) return;
+
+          try {
+            final formProvider = Provider.of<FormProvider>(context, listen: false);
+            formProvider.setPhoto2(photo.path);
+            print('✅ Caminho da segunda foto definido no FormProvider');
+          } catch (e) {
+            print('❌ Erro ao definir segunda foto no FormProvider: $e');
+          }
+        } else {
+          print('⚠️ Nenhuma segunda foto foi capturada');
+        }
+      } else {
+        print('❌ Permissão de câmera negada');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Permissão de câmera necessária para capturar foto'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e, stackTrace) {
+      print('❌ Erro ao capturar segunda foto: $e');
+      print('📋 Stack trace: $stackTrace');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao capturar segunda foto: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _retakePhoto2() {
+    print('🔄 Refazendo segunda foto');
+    setState(() {
+      _capturedPhoto2 = null;
+    });
+  }
+
   Future<void> _getCurrentLocation() async {
     print('📍 Tentando obter localização');
     
@@ -525,14 +721,14 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
     }
   }
 
-  void _completeForm() {
+  Future<void> _completeForm() async {
     print('🏁 Finalizando formulário');
-    
+
     if (_isNavigating) {
       print('⚠️ Já está navegando, ignorando');
       return;
     }
-    
+
     // Verificar se foto é obrigatória
    /* if (widget.questionnaire.requiresPhoto && _capturedPhoto == null) {
       print('❌ Foto obrigatória não capturada');
@@ -544,17 +740,50 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
       );
       return;
     } */
-    
+
     setState(() {
       _isNavigating = true;
     });
-    
+
     try {
-      // Debug do FormProvider antes de navegar
       final formProvider = Provider.of<FormProvider>(context, listen: false);
-      formProvider.debugPrintCurrentState();
-      
+
+      print('📤 ========================================');
+      print('📤 === SUBMETENDO FORMULÁRIO COM FOTO ===');
+      print('📤 ========================================');
+      print('✏️ Modo de edição: ${formProvider.isEditMode}');
+      print('✏️ ID do formulário em edição: ${formProvider.editingFormId}');
+      print('📋 ID do formulário atual: ${formProvider.currentForm?.id}');
+      print('📸 Foto capturada: ${_capturedPhoto?.path}');
+
+      // SUBMETER O FORMULÁRIO ANTES DE NAVEGAR
+      bool success = await formProvider.submitFormWithPhoto(null);
+
+      if (!success) {
+        print('❌ Falha ao submeter formulário com foto');
+        setState(() {
+          _isNavigating = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(formProvider.isEditMode
+                  ? 'Erro ao atualizar formulário. Tente novamente.'
+                  : 'Erro ao salvar formulário. Tente novamente.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      print('✅ Formulário com foto submetido com sucesso!');
       print('🔄 Navegando para FormCompletedScreen');
+
+      // Debug do FormProvider após submissão
+      formProvider.debugPrintCurrentState();
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -564,13 +793,13 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
         ),
       );
     } catch (e, stackTrace) {
-      print('❌ Erro ao navegar para tela de conclusão: $e');
+      print('❌ Erro ao finalizar com foto: $e');
       print('📋 Stack trace: $stackTrace');
-      
+
       setState(() {
         _isNavigating = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

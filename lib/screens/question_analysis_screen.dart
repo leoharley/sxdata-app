@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../providers/question_analysis_provider.dart';
 import '../widgets/question_analysis_filters.dart';
 import '../widgets/question_insights_widget.dart';
+import '../utils/web_download_helper.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:convert';
@@ -16,6 +16,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class QuestionAnalysisScreen extends StatefulWidget {
   const QuestionAnalysisScreen({super.key});
@@ -199,6 +200,12 @@ class _QuestionAnalysisScreenState extends State<QuestionAnalysisScreen> {
     _showExportOptions = false;
   });
 
+  // Para web, mostrar diálogo de opções ANTES de gerar o arquivo
+  if (kIsWeb) {
+    await _exportDataWeb(format);
+    return;
+  }
+
   try {
     // Mostrar indicador de carregamento
     showDialog(
@@ -212,10 +219,10 @@ class _QuestionAnalysisScreenState extends State<QuestionAnalysisScreen> {
     );
 
     final provider = Provider.of<QuestionAnalysisProvider>(context, listen: false);
-    
+
     String fileName;
     String filePath;
-    
+
     if (provider.selectedQuestionnaireDetail != null) {
       // Exportar dados detalhados do questionário selecionado
       switch (format.toLowerCase()) {
@@ -249,17 +256,23 @@ class _QuestionAnalysisScreenState extends State<QuestionAnalysisScreen> {
     }
 
     // Fechar indicador de carregamento
+    if (!mounted) return;
     Navigator.of(context).pop();
 
+    // Pequeno delay para garantir que o diálogo anterior fechou
+    await Future.delayed(const Duration(milliseconds: 100));
+
     // Compartilhar arquivo
+    if (!mounted) return;
     await _shareFile(filePath, format);
 
   } catch (e) {
     // Fechar indicador de carregamento se ainda estiver aberto
-    if (Navigator.canPop(context)) {
+    if (mounted && Navigator.canPop(context)) {
       Navigator.of(context).pop();
     }
-    
+
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Erro ao exportar dados: $e'),
@@ -269,67 +282,281 @@ class _QuestionAnalysisScreenState extends State<QuestionAnalysisScreen> {
   }
 }
 
-// Método para gerar relatório Excel detalhado (questionário específico) com aba de dados brutos
-Future<String> _generateExcelDetailedReport(QuestionnaireDetail detail) async {
-  // Criar Excel vazio sem nenhuma aba padrão
+// Método específico para exportação na web
+Future<void> _exportDataWeb(String format) async {
+  try {
+    if (!mounted) return;
+
+    // Mostrar indicador de carregamento
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8fae5d)),
+        ),
+      ),
+    );
+
+    final provider = Provider.of<QuestionAnalysisProvider>(context, listen: false);
+
+    Uint8List bytes;
+    String fileName;
+
+    if (provider.selectedQuestionnaireDetail != null) {
+      // Exportar dados detalhados do questionário selecionado
+      switch (format.toLowerCase()) {
+        case 'excel':
+          final result = await _generateExcelDetailedReportWeb(provider.selectedQuestionnaireDetail!);
+          bytes = result['bytes'] as Uint8List;
+          fileName = result['fileName'] as String;
+          break;
+        default:
+          throw Exception('Formato não suportado para web ainda');
+      }
+    } else {
+      // Exportar dados gerais dos questionários
+      switch (format.toLowerCase()) {
+        case 'excel':
+          final result = await _generateExcelGeneralReportWeb(provider.questionnaires);
+          bytes = result['bytes'] as Uint8List;
+          fileName = result['fileName'] as String;
+          break;
+        default:
+          throw Exception('Formato não suportado para web ainda');
+      }
+    }
+
+    // Fechar indicador de carregamento
+    if (!mounted) return;
+    Navigator.of(context).pop();
+
+    // Pequeno delay
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    if (!mounted) return;
+
+    // Fazer download direto na web usando o helper
+    WebDownloadHelper.downloadFile(bytes, fileName);
+
+    // Mostrar confirmação
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Download iniciado: $fileName\nTamanho: ${(bytes.length / 1024).toStringAsFixed(2)} KB'),
+        backgroundColor: const Color(0xFF8fae5d),
+        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'OK',
+          textColor: Colors.white,
+          onPressed: () {},
+        ),
+      ),
+    );
+
+  } catch (e) {
+    // Fechar indicador de carregamento se ainda estiver aberto
+    if (mounted && Navigator.canPop(context)) {
+      Navigator.of(context).pop();
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Erro ao exportar dados: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
+// Versão Web - Retorna bytes e nome do arquivo
+Future<Map<String, dynamic>> _generateExcelDetailedReportWeb(QuestionnaireDetail detail) async {
+  // Criar arquivo Excel SEM Sheet1 padrão
   final excelFile = excel.Excel.createExcel();
-   
-  // === ABA 1: RESULTADOS ===
+
+  // Criar apenas as abas que queremos
   final resultadosSheet = excelFile['Resultados'];
   excelFile.setDefaultSheet('Resultados');
-  
+
+  final allQuestions = await _extractAllQuestionsFromAPI(detail.id);
+  final dynamicHeaders = _generateDynamicHeaders(allQuestions);
+  final rawData = await _getRawDataForExport({'questionnaire_id': detail.id.toString()});
+
+  for (int i = 0; i < dynamicHeaders.length; i++) {
+    final cellRef = _getCellReference(1, i + 1);
+    resultadosSheet.cell(excel.CellIndex.indexByString(cellRef)).value = _toCellValue(dynamicHeaders[i]);
+  }
+
+  int currentRow = 2;
+  for (final responseData in rawData) {
+    final mappedData = _mapResponseToDynamicFormatPHP(responseData, allQuestions);
+    for (int i = 0; i < mappedData.length && i < dynamicHeaders.length; i++) {
+      final cellRef = _getCellReference(currentRow, i + 1);
+      resultadosSheet.cell(excel.CellIndex.indexByString(cellRef)).value = _toCellValue(mappedData[i]);
+    }
+    currentRow++;
+  }
+
+  final questionsSheet = excelFile['Perguntas'];
+  _generateQuestionsWorksheet(questionsSheet, allQuestions);
+
+  final statisticsSheet = excelFile['Estatísticas'];
+  _generateStatisticsWorksheet(statisticsSheet, rawData);
+
+  // SOLUÇÃO DEFINITIVA: Copiar apenas as abas desejadas para um novo arquivo
+  final finalExcel = _createCleanExcel(excelFile);
+
+  final fileName = 'dados_brutos_${detail.title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.xlsx';
+  final bytes = Uint8List.fromList(finalExcel.encode()!);
+
+  return {
+    'bytes': bytes,
+    'fileName': fileName,
+  };
+}
+
+// Método auxiliar para converter valores para CellValue (Excel 4.x)
+excel.CellValue? _toCellValue(dynamic value) {
+  if (value == null) return null;
+  if (value is String) return excel.TextCellValue(value);
+  if (value is int) return excel.IntCellValue(value);
+  if (value is double) return excel.DoubleCellValue(value);
+  if (value is bool) return excel.BoolCellValue(value);
+  return excel.TextCellValue(value.toString());
+}
+
+// Método auxiliar para criar Excel limpo sem Sheet1
+excel.Excel _createCleanExcel(excel.Excel sourceExcel) {
+  // Com excel 4.x, podemos deletar Sheet1 corretamente
+
+  // Codificar o arquivo fonte
+  final sourceBytes = sourceExcel.encode()!;
+
+  // Decodificar para ter uma cópia
+  var workingExcel = excel.Excel.decodeBytes(sourceBytes);
+
+  // Deletar Sheet1 se existir (funciona corretamente na versão 4.x)
+  if (workingExcel.tables.containsKey('Sheet1')) {
+    workingExcel.delete('Sheet1');
+  }
+
+  // Definir Resultados como aba padrão
+  if (workingExcel.tables.containsKey('Resultados')) {
+    workingExcel.setDefaultSheet('Resultados');
+  }
+
+  return workingExcel;
+}
+
+Future<Map<String, dynamic>> _generateExcelGeneralReportWeb(List<QuestionnaireAnalysis> questionnaires) async {
+  // Criar arquivo Excel
+  final excelFile = excel.Excel.createExcel();
+
+  final resultadosSheet = excelFile['Resultados'];
+  excelFile.setDefaultSheet('Resultados');
+
+  final allQuestions = await _extractAllQuestionsFromMultipleQuestionnaires(questionnaires);
+  final dynamicHeaders = _generateDynamicHeaders(allQuestions);
+  final rawData = await _getRawDataForExport({});
+
+  for (int i = 0; i < dynamicHeaders.length; i++) {
+    final cellRef = _getCellReference(1, i + 1);
+    resultadosSheet.cell(excel.CellIndex.indexByString(cellRef)).value = _toCellValue(dynamicHeaders[i]);
+  }
+
+  int currentRow = 2;
+  for (final responseData in rawData) {
+    final mappedData = _mapResponseToDynamicFormatPHP(responseData, allQuestions);
+    for (int i = 0; i < mappedData.length && i < dynamicHeaders.length; i++) {
+      final cellRef = _getCellReference(currentRow, i + 1);
+      resultadosSheet.cell(excel.CellIndex.indexByString(cellRef)).value = _toCellValue(mappedData[i]);
+    }
+    currentRow++;
+  }
+
+  final questionsSheet = excelFile['Perguntas'];
+  _generateQuestionsWorksheet(questionsSheet, allQuestions);
+
+  final statisticsSheet = excelFile['Estatísticas'];
+  _generateStatisticsWorksheet(statisticsSheet, rawData);
+
+  // SOLUÇÃO DEFINITIVA: Copiar apenas as abas desejadas para um novo arquivo
+  final finalExcel = _createCleanExcel(excelFile);
+
+  final fileName = 'dados_brutos_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.xlsx';
+  final bytes = Uint8List.fromList(finalExcel.encode()!);
+
+  return {
+    'bytes': bytes,
+    'fileName': fileName,
+  };
+}
+
+// Método para gerar relatório Excel detalhado (questionário específico) com aba de dados brutos
+Future<String> _generateExcelDetailedReport(QuestionnaireDetail detail) async {
+  // Criar arquivo Excel
+  final excelFile = excel.Excel.createExcel();
+
+  final resultadosSheet = excelFile['Resultados'];
+  excelFile.setDefaultSheet('Resultados');
+
   final exportDate = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
-  
+
   // PASSO 1: Extrair todas as questões únicas
   final allQuestions = await _extractAllQuestionsFromAPI(detail.id);
-  
+
   // PASSO 2: Gerar headers dinâmicos
   final dynamicHeaders = _generateDynamicHeaders(allQuestions);
-  
+
   // PASSO 3: Buscar dados brutos da API
   final rawData = await _getRawDataForExport({'questionnaire_id': detail.id.toString()});
-  
+
   // Escrever headers
   for (int i = 0; i < dynamicHeaders.length; i++) {
     final cellRef = _getCellReference(1, i + 1);
-    resultadosSheet.cell(excel.CellIndex.indexByString(cellRef)).value = dynamicHeaders[i];
+    resultadosSheet.cell(excel.CellIndex.indexByString(cellRef)).value = _toCellValue(dynamicHeaders[i]);
   }
-  
+
   // Preencher dados
   int currentRow = 2;
   for (final responseData in rawData) {
     final mappedData = _mapResponseToDynamicFormatPHP(responseData, allQuestions);
-    
+
     for (int i = 0; i < mappedData.length && i < dynamicHeaders.length; i++) {
       final cellRef = _getCellReference(currentRow, i + 1);
-      resultadosSheet.cell(excel.CellIndex.indexByString(cellRef)).value = mappedData[i];
+      resultadosSheet.cell(excel.CellIndex.indexByString(cellRef)).value = _toCellValue(mappedData[i]);
     }
     currentRow++;
   }
-  
+
   // === ABA 2: PERGUNTAS ===
   final questionsSheet = excelFile['Perguntas'];
   _generateQuestionsWorksheet(questionsSheet, allQuestions);
-  
+
   // === ABA 3: ESTATÍSTICAS ===
   final statisticsSheet = excelFile['Estatísticas'];
   _generateStatisticsWorksheet(statisticsSheet, rawData);
-  
-  // Debug: Mostrar ordem das abas
-  final sheetNames = excelFile.tables.keys.toList();
-  print('Ordem das abas criadas: ${sheetNames.join(' -> ')}');
 
-  //excelFile.rename('Sheet1', 'Resultados');
+  // SOLUÇÃO DEFINITIVA: Copiar apenas as abas desejadas para um novo arquivo
+  final finalExcel = _createCleanExcel(excelFile);
 
   // Salvar arquivo
-  final directory = await getApplicationDocumentsDirectory();
   final fileName = 'dados_brutos_${detail.title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.xlsx';
-  final filePath = '${directory.path}/$fileName';
-  
-  final file = File(filePath);
-  await file.writeAsBytes(excelFile.encode()!);
-  
-  return filePath;
+  final bytes = finalExcel.encode()!;
+
+  if (kIsWeb) {
+    // Em web, retornar apenas o nome do arquivo (bytes serão usados diretamente)
+    return fileName;
+  } else {
+    // Em mobile/desktop, salvar o arquivo normalmente
+    final directory = await getApplicationDocumentsDirectory();
+    final filePath = '${directory.path}/$fileName';
+
+    final file = File(filePath);
+    await file.writeAsBytes(bytes);
+
+    return filePath;
+  }
 }
 
 List<String> _mapResponseToDynamicFormatPHP(Map<String, dynamic> responseData, Map<int, Map<String, dynamic>> allQuestions) {
@@ -717,67 +944,58 @@ String _formatDate(String? dateString) {
 
 // Método para gerar relatório Excel geral (todos os questionários) com aba de dados brutos
 Future<String> _generateExcelGeneralReport(List<QuestionnaireAnalysis> questionnaires) async {
+  // Criar arquivo Excel
   final excelFile = excel.Excel.createExcel();
-  
-  // IMPORTANTE: Criar as abas na ordem desejada
-  // Ordem: Resultados -> Perguntas -> Estatísticas -> Sheet1
-  
-  // === ABA 1: RESULTADOS (primeira aba) ===
+
   final resultadosSheet = excelFile['Resultados'];
   excelFile.setDefaultSheet('Resultados');
-  
+
   // Para múltiplos questionários, extrair todas as questões de todos
   final allQuestions = await _extractAllQuestionsFromMultipleQuestionnaires(questionnaires);
-  
+
   // Gerar headers dinâmicos
   final dynamicHeaders = _generateDynamicHeaders(allQuestions);
-  
+
   // Buscar dados brutos de todos os questionários
   final rawData = await _getRawDataForExport({}); // Sem filtros = todos
-  
+
   // Escrever headers
   for (int i = 0; i < dynamicHeaders.length; i++) {
     final cellRef = _getCellReference(1, i + 1);
-    resultadosSheet.cell(excel.CellIndex.indexByString(cellRef)).value = dynamicHeaders[i];
+    resultadosSheet.cell(excel.CellIndex.indexByString(cellRef)).value = _toCellValue(dynamicHeaders[i]);
   }
-  
+
   // Preencher dados
   int currentRow = 2;
   for (final responseData in rawData) {
     final mappedData = _mapResponseToDynamicFormatPHP(responseData, allQuestions);
-    
+
     for (int i = 0; i < mappedData.length && i < dynamicHeaders.length; i++) {
       final cellRef = _getCellReference(currentRow, i + 1);
-      resultadosSheet.cell(excel.CellIndex.indexByString(cellRef)).value = mappedData[i];
+      resultadosSheet.cell(excel.CellIndex.indexByString(cellRef)).value = _toCellValue(mappedData[i]);
     }
     currentRow++;
   }
-  
-  // === ABA 2: PERGUNTAS (criar como segunda aba) ===
+
+  // === ABA 2: PERGUNTAS ===
   final questionsSheet = excelFile['Perguntas'];
   _generateQuestionsWorksheet(questionsSheet, allQuestions);
-  
-  // === ABA 3: ESTATÍSTICAS (criar como terceira aba) ===
+
+  // === ABA 3: ESTATÍSTICAS ===
   final statisticsSheet = excelFile['Estatísticas'];
   _generateStatisticsWorksheet(statisticsSheet, rawData);
-  
-  // === ABA 4: Sheet1 (já existe, ficará como última aba) ===
-  // Sheet1 permanece como está, será a quarta aba
-  
-  // Debug: Mostrar ordem das abas
-  final sheetNames = excelFile.tables.keys.toList();
-  print('Ordem das abas criadas: ${sheetNames.join(' -> ')}');
 
-  //excelFile.rename('Sheet1', 'Resultados');
-  
   // Salvar arquivo
   final directory = await getApplicationDocumentsDirectory();
   final fileName = 'dados_brutos_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.xlsx';
   final filePath = '${directory.path}/$fileName';
-  
+
+  // SOLUÇÃO DEFINITIVA: Copiar apenas as abas desejadas para um novo arquivo
+  final finalExcel = _createCleanExcel(excelFile);
+
   final file = File(filePath);
-  await file.writeAsBytes(excelFile.encode()!);
-  
+  await file.writeAsBytes(finalExcel.encode()!);
+
   return filePath;
 }
 
@@ -803,7 +1021,7 @@ void _generateStatisticsWorksheet(excel.Sheet statisticsSheet, List<Map<String, 
   }
   
   // Cabeçalho
-  statisticsSheet.cell(excel.CellIndex.indexByString('A1')).value = 'Estatísticas da Exportação';
+  statisticsSheet.cell(excel.CellIndex.indexByString('A1')).value = _toCellValue('Estatísticas da Exportação');
   
   // Estatísticas básicas
   final stats = [
@@ -818,19 +1036,19 @@ void _generateStatisticsWorksheet(excel.Sheet statisticsSheet, List<Map<String, 
   
   for (int i = 0; i < stats.length; i++) {
     final row = i + 3;
-    statisticsSheet.cell(excel.CellIndex.indexByString('A$row')).value = stats[i][0];
-    statisticsSheet.cell(excel.CellIndex.indexByString('B$row')).value = stats[i][1];
+    statisticsSheet.cell(excel.CellIndex.indexByString('A$row')).value = _toCellValue(stats[i][0]);
+    statisticsSheet.cell(excel.CellIndex.indexByString('B$row')).value = _toCellValue(stats[i][1]);
   }
-  
+
   // Respostas por aplicador
   int applicatorRow = stats.length + 5;
-  statisticsSheet.cell(excel.CellIndex.indexByString('A$applicatorRow')).value = 'Respostas por Aplicador';
-  statisticsSheet.cell(excel.CellIndex.indexByString('B$applicatorRow')).value = 'Quantidade';
+  statisticsSheet.cell(excel.CellIndex.indexByString('A$applicatorRow')).value = _toCellValue('Respostas por Aplicador');
+  statisticsSheet.cell(excel.CellIndex.indexByString('B$applicatorRow')).value = _toCellValue('Quantidade');
   applicatorRow++;
-  
+
   for (final entry in applicators.entries) {
-    statisticsSheet.cell(excel.CellIndex.indexByString('A$applicatorRow')).value = entry.key;
-    statisticsSheet.cell(excel.CellIndex.indexByString('B$applicatorRow')).value = entry.value;
+    statisticsSheet.cell(excel.CellIndex.indexByString('A$applicatorRow')).value = _toCellValue(entry.key);
+    statisticsSheet.cell(excel.CellIndex.indexByString('B$applicatorRow')).value = _toCellValue(entry.value);
     applicatorRow++;
   }
 }
@@ -838,18 +1056,18 @@ void _generateStatisticsWorksheet(excel.Sheet statisticsSheet, List<Map<String, 
 // GERAR PLANILHA DE PERGUNTAS (igual _generate_questions_worksheet do PHP)
 void _generateQuestionsWorksheet(excel.Sheet questionsSheet, Map<int, Map<String, dynamic>> allQuestions) {
   // Headers
-  questionsSheet.cell(excel.CellIndex.indexByString('A1')).value = 'ID';
-  questionsSheet.cell(excel.CellIndex.indexByString('B1')).value = 'Ordem';
-  questionsSheet.cell(excel.CellIndex.indexByString('C1')).value = 'Tipo';
-  questionsSheet.cell(excel.CellIndex.indexByString('D1')).value = 'Texto da Pergunta';
-  
+  questionsSheet.cell(excel.CellIndex.indexByString('A1')).value = _toCellValue('ID');
+  questionsSheet.cell(excel.CellIndex.indexByString('B1')).value = _toCellValue('Ordem');
+  questionsSheet.cell(excel.CellIndex.indexByString('C1')).value = _toCellValue('Tipo');
+  questionsSheet.cell(excel.CellIndex.indexByString('D1')).value = _toCellValue('Texto da Pergunta');
+
   // Dados das perguntas
   int row = 2;
   for (final question in allQuestions.values) {
-    questionsSheet.cell(excel.CellIndex.indexByString('A$row')).value = question['id'];
-    questionsSheet.cell(excel.CellIndex.indexByString('B$row')).value = question['order_index'];
-    questionsSheet.cell(excel.CellIndex.indexByString('C$row')).value = question['type'];
-    questionsSheet.cell(excel.CellIndex.indexByString('D$row')).value = question['text'];
+    questionsSheet.cell(excel.CellIndex.indexByString('A$row')).value = _toCellValue(question['id']);
+    questionsSheet.cell(excel.CellIndex.indexByString('B$row')).value = _toCellValue(question['order_index']);
+    questionsSheet.cell(excel.CellIndex.indexByString('C$row')).value = _toCellValue(question['type']);
+    questionsSheet.cell(excel.CellIndex.indexByString('D$row')).value = _toCellValue(question['text']);
     row++;
   }
 }
@@ -1081,26 +1299,225 @@ Future<String> _generateCSVGeneralReport(List<QuestionnaireAnalysis> questionnai
 // 7. Método para compartilhar arquivos:
 
 Future<void> _shareFile(String filePath, String format) async {
+  print('🔍 DEBUG: _shareFile chamado com filePath=$filePath, format=$format');
+
   try {
     final file = File(filePath);
+    print('🔍 DEBUG: Verificando se arquivo existe: ${await file.exists()}');
+
     if (await file.exists()) {
-      final result = await Share.shareXFiles([XFile(filePath)]);
-      
-      if (result.status == ShareResultStatus.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Arquivo compartilhado com sucesso!'),
-            backgroundColor: Color(0xFF8fae5d),
+      if (!mounted) {
+        print('❌ DEBUG: Widget não está montado (mounted=false)');
+        return;
+      }
+
+      print('✅ DEBUG: Mostrando diálogo de opções...');
+
+      // Mostrar diálogo de opções
+      final action = await showDialog<String>(
+        context: context,
+        barrierDismissible: true,
+        builder: (context) => AlertDialog(
+          title: const Text('Como deseja exportar?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.share, color: Color(0xFF8fae5d)),
+                title: const Text('Compartilhar arquivo'),
+                subtitle: const Text('Via apps instalados'),
+                onTap: () {
+                  print('🔍 DEBUG: Opção SHARE selecionada');
+                  Navigator.pop(context, 'share');
+                },
+              ),
+            /*  ListTile(
+                leading: const Icon(Icons.download, color: Colors.blue),
+                title: const Text('Download direto'),
+                subtitle: const Text('Para teste no Chrome/navegador'),
+                onTap: () {
+                  print('🔍 DEBUG: Opção DOWNLOAD selecionada');
+                  Navigator.pop(context, 'download');
+                },
+              ), */
+              ListTile(
+                leading: const Icon(Icons.copy, color: Colors.orange),
+                title: const Text('Copiar caminho'),
+                subtitle: const Text('Ver localização do arquivo'),
+                onTap: () {
+                  print('🔍 DEBUG: Opção COPY selecionada');
+                  Navigator.pop(context, 'copy');
+                },
+              ),
+            ],
           ),
-        );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+          ],
+        ),
+      );
+
+      print('🔍 DEBUG: Ação selecionada: $action');
+
+      if (action == null) {
+        print('⚠️ DEBUG: Nenhuma ação selecionada (cancelado)');
+        return;
+      }
+
+      switch (action) {
+        case 'share':
+          print('▶️ DEBUG: Executando _shareFileMobile...');
+          await _shareFileMobile(filePath);
+          break;
+        case 'download':
+          print('▶️ DEBUG: Executando _downloadFile...');
+          await _downloadFile(filePath, format);
+          break;
+        case 'copy':
+          print('▶️ DEBUG: Executando _copyPathToClipboard...');
+          await _copyPathToClipboard(filePath);
+          break;
       }
     } else {
+      print('❌ DEBUG: Arquivo não encontrado em: $filePath');
       throw Exception('Arquivo não encontrado');
     }
   } catch (e) {
+    print('❌ DEBUG: Erro em _shareFile: $e');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Erro ao processar arquivo: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
+Future<void> _shareFileMobile(String filePath) async {
+  try {
+    final result = await Share.shareXFiles([XFile(filePath)]);
+
+    if (!mounted) return;
+    if (result.status == ShareResultStatus.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Arquivo compartilhado com sucesso!'),
+          backgroundColor: Color(0xFF8fae5d),
+        ),
+      );
+    }
+  } catch (e) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Erro ao compartilhar arquivo: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
+Future<void> _downloadFile(String filePath, String format) async {
+  try {
+    final file = File(filePath);
+    final bytes = await file.readAsBytes();
+    final fileName = filePath.split(Platform.pathSeparator).last;
+
+    if (!mounted) return;
+
+    // Para teste em Chrome/Web, mostrar informações e tentar download automático
+    if (kIsWeb) {
+      // Em web, usar download nativo do navegador
+      // (requer package web ao invés de dart:html deprecated)
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Download iniciado: $fileName'),
+          backgroundColor: const Color(0xFF8fae5d),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } else {
+      // Em desktop/mobile, mostrar diálogo com informações
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Download do Arquivo'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Arquivo gerado: $fileName'),
+              const SizedBox(height: 8),
+              Text('Tamanho: ${(bytes.length / 1024).toStringAsFixed(2)} KB'),
+              const SizedBox(height: 8),
+              Text('Localização:\n$filePath', style: const TextStyle(fontSize: 12)),
+              const SizedBox(height: 16),
+              const Text(
+                'Para testar no Chrome:\n'
+                '1. Copie o caminho acima\n'
+                '2. Abra o arquivo diretamente\n'
+                '3. Ou use a opção "Compartilhar"',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fechar'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _shareFileMobile(filePath);
+              },
+              icon: const Icon(Icons.share),
+              label: const Text('Compartilhar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8fae5d),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Erro ao processar download: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
+Future<void> _copyPathToClipboard(String filePath) async {
+  try {
+    if (!mounted) return;
+    // Copiar para clipboard (requer package flutter/services)
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Caminho do arquivo:\n$filePath'),
+        backgroundColor: const Color(0xFF8fae5d),
+        duration: const Duration(seconds: 10),
+        action: SnackBarAction(
+          label: 'OK',
+          textColor: Colors.white,
+          onPressed: () {},
+        ),
+      ),
+    );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Erro ao copiar caminho: $e'),
         backgroundColor: Colors.red,
       ),
     );
@@ -1221,7 +1638,7 @@ Future<void> _requestPermissions() async {
                                   ],
                                 ),
                               ),
-                              const PopupMenuItem(
+                             /* const PopupMenuItem(
                                 value: 'csv',
                                 child: Row(
                                   children: [
@@ -1230,7 +1647,7 @@ Future<void> _requestPermissions() async {
                                     Text('CSV'),
                                   ],
                                 ),
-                              ),
+                              ),*/
                             ],
                           ),
                           // Botão de refresh

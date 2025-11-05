@@ -6,6 +6,7 @@ import '../providers/form_provider.dart';
 import '../widgets/question_widgets.dart';
 import 'photo_capture_screen.dart';
 import 'form_completed_screen.dart';
+import '../providers/auth_provider.dart';
 
 class QuestionScreen extends StatefulWidget {
   final Questionnaire questionnaire;
@@ -55,21 +56,51 @@ class _QuestionScreenState extends State<QuestionScreen> {
 
     try {
       final formProvider = Provider.of<FormProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Garantir que o FormProvider está limpo
+      // VERIFICAR SE ESTÁ EM MODO DE EDIÇÃO
+      if (formProvider.isEditMode) {
+        print('✏️ MODO DE EDIÇÃO DETECTADO - Mantendo respostas existentes');
+        print('📝 Respostas carregadas: ${formProvider.responses.length}');
+        print('📝 Formulário atual: ${formProvider.currentForm}');
+
+        // Verificar se já existe um formulário atual
+        if (formProvider.currentForm == null) {
+          // Se não existe, criar um novo formulário para edição
+          print('📝 Criando formulário de edição...');
+          formProvider.startForm(
+            widget.questionnaire.id,
+            authProvider.user!.id,
+            widget.questionnaire.questions,
+          );
+        } else {
+          // Se já existe, apenas inicializar as questões
+          print('📝 Formulário já existe, inicializando questões...');
+          formProvider.initialize(widget.questionnaire.questions);
+        }
+
+        // Executar lógica condicional com as respostas já carregadas
+        formProvider.debugConditionalLogic();
+
+        setState(() {
+          _isInitialized = true;
+        });
+
+        print('✅ Modo de edição inicializado com ${formProvider.responses.length} respostas');
+        return;
+      }
+
+      // Se NÃO está em modo de edição, limpar e criar novo formulário
+      print('📝 MODO NOVO FORMULÁRIO - Limpando dados anteriores');
       formProvider.clearForm();
 
-      // CORREÇÃO: Usar startForm ao invés de initialize para criar um formulário ativo
-      // Você pode passar o ID do usuário aqui - substitua por sua lógica de obtenção do usuário
-      const int userId = 1; // TODO: Obter ID do usuário real do seu sistema de autenticação
-      
       print('🚀 Iniciando formulário com ID do questionário: ${widget.questionnaire.id}');
-      print('👤 ID do usuário: $userId');
+      print('👤 ID do usuário: ${authProvider.user!.id}');
       print('📝 Questões: ${widget.questionnaire.questions.length}');
 
       formProvider.startForm(
         widget.questionnaire.id,
-        userId,
+        authProvider.user!.id,
         widget.questionnaire.questions,
       );
 
@@ -312,27 +343,33 @@ class _QuestionScreenState extends State<QuestionScreen> {
   }
 
   Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(color: Color.fromRGBO(35, 52, 95, 1.0)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(20),
+    decoration: const BoxDecoration(color: Color.fromRGBO(35, 52, 95, 1.0)),
+    child: Row(
+      children: [
+        // Espaço vazio à esquerda
+        const Expanded(child: SizedBox()),
+        
+        // Imagem centralizada
+        Image.asset(
+          'assets/images/Logo_verde2.png',
+          width: 120,
+          fit: BoxFit.contain,
+        ),
+        
+        // Espaço à direita com ícone
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: const Icon(Icons.quiz, color: Color(0xFF8fae5d), size: 24),
           ),
-          Image.asset(
-            'assets/images/Logo_verde2.png',
-            width: 120,
-            fit: BoxFit.contain,
-          ),
-          const Icon(Icons.quiz, color: Color(0xFF8fae5d), size: 24),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   int _getOriginalIndex(Question question, FormProvider formProvider) {
     for (int i = 0; i < formProvider.questions.length; i++) {
@@ -410,8 +447,8 @@ class _QuestionScreenState extends State<QuestionScreen> {
 
                   const SizedBox(height: 20),
 
-                  // Debug info
-                  Container(
+                  // Debug da questão
+               /*   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: Colors.blue.shade50,
@@ -445,7 +482,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 10), */
 
                   // Widget da questão
                   QuestionWidget(
@@ -542,7 +579,9 @@ class _QuestionScreenState extends State<QuestionScreen> {
                 elevation: 2,
               ),
               child: Text(
-                isLastQuestion ? 'Finalizar' : 'Próxima',
+                isLastQuestion
+                    ? (formProvider.isEditMode ? 'Atualizar' : 'Finalizar')
+                    : 'Próxima',
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
@@ -623,28 +662,31 @@ class _QuestionScreenState extends State<QuestionScreen> {
 
   Future<void> _submitAndNavigate(FormProvider formProvider) async {
   print('📤 === SUBMETENDO FORMULÁRIO SEM FOTO ===');
-  
+  print('✏️ Modo de edição: ${formProvider.isEditMode}');
+  print('✏️ ID do formulário em edição: ${formProvider.editingFormId}');
+
   // Verificar se há formulário ou respostas para submeter
   final hasResponses = formProvider.responses.isNotEmpty;
   final hasForm = formProvider.currentForm != null;
-  
+
   print('📊 Status antes da submissão:');
   print('   - Formulário ativo: $hasForm');
+  print('   - ID do formulário: ${formProvider.currentForm?.id}');
   print('   - Respostas coletadas: ${formProvider.responses.length}');
   print('   - Questões processadas: ${formProvider.questions.length}');
-  
+
   if (!hasResponses && !hasForm) {
     print('⚠️ Nenhum dado para submeter, navegando direto');
     _navigateToCompletedScreen();
     return;
   }
-  
+
   // Mostrar loading
   ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
+    SnackBar(
       content: Row(
         children: [
-          SizedBox(
+          const SizedBox(
             width: 20,
             height: 20,
             child: CircularProgressIndicator(
@@ -652,46 +694,35 @@ class _QuestionScreenState extends State<QuestionScreen> {
               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
             ),
           ),
-          SizedBox(width: 16),
-          Text('Salvando respostas...'),
+          const SizedBox(width: 16),
+          Text(formProvider.isEditMode ? 'Atualizando respostas...' : 'Salvando respostas...'),
         ],
       ),
-      backgroundColor: Color(0xFF8fae5d),
-      duration: Duration(seconds: 10),
+      backgroundColor: const Color(0xFF8fae5d),
+      duration: const Duration(seconds: 10),
     ),
   );
 
   try {
     bool success = false;
-    
-    if (hasForm) {
-      // Submeter usando o formulário ativo
-      success = await formProvider.submitForm();
-    } else {
-      // Fallback: criar formulário temporário para submissão
-      print('🔄 Criando formulário temporário para submissão...');
-      
-      // Criar formulário temporário se necessário
-      formProvider.startForm(
-        widget.questionnaire.id,
-        1, // TODO: Obter ID do usuário real
-        widget.questionnaire.questions,
-      );
-      
-      success = await formProvider.submitForm();
-    }
-    
+
+    // SEMPRE submeter diretamente, SEM criar novo formulário
+    print('📤 Submetendo formulário existente (ID: ${formProvider.currentForm?.id})...');
+    success = await formProvider.submitForm();
+
     // Remover snackbar de loading
     ScaffoldMessenger.of(context).clearSnackBars();
-    
+
     if (success) {
       print('✅ Formulário submetido com sucesso');
       _navigateToCompletedScreen();
     } else {
       print('❌ Falha ao submeter formulário');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erro ao salvar formulário. Tente novamente.'),
+        SnackBar(
+          content: Text(formProvider.isEditMode
+            ? 'Erro ao atualizar formulário. Tente novamente.'
+            : 'Erro ao salvar formulário. Tente novamente.'),
           backgroundColor: Colors.red,
         ),
       );

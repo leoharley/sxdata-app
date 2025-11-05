@@ -9,39 +9,40 @@ class PhotoStorageService {
   static const String _photosFolderName = 'offline_photos';
 
   /// Salva uma foto localmente para sincronização posterior
-  static Future<String> savePhotoOffline(File originalPhoto, int formId) async {
+  /// [photoType] pode ser 'photo1' ou 'photo2' para identificar qual foto é
+  static Future<String> savePhotoOffline(File originalPhoto, int formId, {String photoType = 'photo1'}) async {
     try {
       print('📸 === SALVANDO FOTO OFFLINE ===');
       print('📸 Form ID: $formId');
+      print('📸 Tipo de foto: $photoType');
       print('📸 Foto original: ${originalPhoto.path}');
-      
+
       // Obter diretório de documentos da aplicação
       final Directory appDocDir = await getApplicationDocumentsDirectory();
       final Directory photosDir = Directory('${appDocDir.path}/$_photosFolderName');
-      
+
       // Criar diretório se não existir
       if (!await photosDir.exists()) {
         await photosDir.create(recursive: true);
         print('📸 Diretório criado: ${photosDir.path}');
       }
-      
-      // Gerar nome único para a foto
+
+      // Gerar nome único para a foto incluindo o tipo
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final String extension = originalPhoto.path.split('.').last;
-      //final String filename = 'form_${formId}_${timestamp}.$extension';
-      final String filename = 'form_${formId}_${timestamp}.$extension';
+      final String filename = 'form_${formId}_${photoType}_${timestamp}.$extension';
       final String localPath = '${photosDir.path}/$filename';
-      
+
       // Copiar foto para diretório local
       final File localPhoto = await originalPhoto.copy(localPath);
       print('📸 Foto copiada para: ${localPhoto.path}');
-      
+
       // Salvar metadados da foto
-      await _savePhotoMetadata(formId, filename, localPath);
-      
+      await _savePhotoMetadata(formId, filename, localPath, photoType: photoType);
+
       print('✅ Foto salva offline com sucesso');
       return filename; // Retorna apenas o filename para salvar no formulário
-      
+
     } catch (e, stackTrace) {
       print('❌ Erro ao salvar foto offline: $e');
       print('📋 Stack trace: $stackTrace');
@@ -50,37 +51,38 @@ class PhotoStorageService {
   }
 
   /// Salva metadados da foto no SharedPreferences
-  static Future<void> _savePhotoMetadata(int formId, String filename, String localPath) async {
+  static Future<void> _savePhotoMetadata(int formId, String filename, String localPath, {String photoType = 'photo1'}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // Carregar metadados existentes
       List<Map<String, dynamic>> photosMetadata = [];
       final String? existingData = prefs.getString(_photosMetadataKey);
-      
+
       if (existingData != null) {
         final List<dynamic> existingList = jsonDecode(existingData);
         photosMetadata = existingList.cast<Map<String, dynamic>>();
       }
-      
+
       // Adicionar nova foto
       final Map<String, dynamic> photoMetadata = {
         'formId': formId,
         'filename': filename,
         'localPath': localPath,
+        'photoType': photoType, // Adiciona o tipo da foto
         'syncStatus': 'pending',
         'createdAt': DateTime.now().toIso8601String(),
         'fileSize': await File(localPath).length(),
       };
-      
+
       photosMetadata.add(photoMetadata);
-      
+
       // Salvar de volta
       final String jsonData = jsonEncode(photosMetadata);
       await prefs.setString(_photosMetadataKey, jsonData);
-      
+
       print('📸 Metadados da foto salvos: $photoMetadata');
-      
+
     } catch (e) {
       print('❌ Erro ao salvar metadados da foto: $e');
       rethrow;
@@ -322,28 +324,39 @@ class PhotoStorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? data = prefs.getString(_photosMetadataKey);
-      
+
       if (data == null) {
         return {
           'total': 0,
           'pending': 0,
           'synced': 0,
           'error': 0,
+          'photo1_pending': 0,
+          'photo2_pending': 0,
         };
       }
-      
+
       final List<dynamic> photosList = jsonDecode(data);
       final List<Map<String, dynamic>> photosMetadata = photosList.cast<Map<String, dynamic>>();
-      
+
       int total = photosMetadata.length;
       int pending = 0;
       int synced = 0;
       int error = 0;
-      
+      int photo1Pending = 0;
+      int photo2Pending = 0;
+
       for (final photo in photosMetadata) {
         switch (photo['syncStatus']) {
           case 'pending':
             pending++;
+            // Contar por tipo de foto
+            final photoType = photo['photoType'] ?? 'photo1';
+            if (photoType == 'photo1') {
+              photo1Pending++;
+            } else if (photoType == 'photo2') {
+              photo2Pending++;
+            }
             break;
           case 'synced':
             synced++;
@@ -353,14 +366,16 @@ class PhotoStorageService {
             break;
         }
       }
-      
+
       return {
         'total': total,
         'pending': pending,
         'synced': synced,
         'error': error,
+        'photo1_pending': photo1Pending,
+        'photo2_pending': photo2Pending,
       };
-      
+
     } catch (e) {
       print('❌ Erro ao obter estatísticas das fotos: $e');
       return {
@@ -368,6 +383,8 @@ class PhotoStorageService {
         'pending': 0,
         'synced': 0,
         'error': 0,
+        'photo1_pending': 0,
+        'photo2_pending': 0,
       };
     }
   }

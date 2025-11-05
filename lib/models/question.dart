@@ -96,28 +96,50 @@ class Question {
   }
 
   factory Question.fromJson(Map<String, dynamic> json) {
-    print('📄 Parsing question: ${json['question_text']}');
-    print('📋 Question JSON: $json');
+    print('📄 === PARSING QUESTION ===');
+    print('📄 Question text: ${json['question_text']}');
+    print('📄 Question type: ${json['question_type']}');
+    print('📄 Full JSON: $json');
 
     try {
       // Parse das opções
       List<QuestionOption> optionsList = [];
-      if (json['options'] != null) {
-        final optionsData = json['options'] as List;
-        print('📘 Found ${optionsData.length} options');
 
-        for (int i = 0; i < optionsData.length; i++) {
-          try {
-            final optionData = optionsData[i] as Map<String, dynamic>;
-            print('📘 Parsing option $i: ${optionData['text']}');
-            final option = QuestionOption.fromJson(optionData);
-            optionsList.add(option);
-            print('✅ Option $i parsed successfully');
-          } catch (e) {
-            print('❌ Error parsing option $i: $e');
-            print('📋 Option data: ${optionsData[i]}');
+      print('📘 Checking for options in JSON...');
+      if (json['options'] != null) {
+        final optionsData = json['options'];
+        print('📘 Options data type: ${optionsData.runtimeType}');
+        print('📘 Options data: $optionsData');
+
+        if (optionsData is List) {
+          print('📘 Found ${optionsData.length} options in list');
+
+          for (int i = 0; i < optionsData.length; i++) {
+            try {
+              final optionData = optionsData[i];
+              print('📘 Processing option $i: $optionData (type: ${optionData.runtimeType})');
+
+              if (optionData is Map<String, dynamic>) {
+                print('📘 Option $i keys: ${optionData.keys.toList()}');
+                print('📘 Option $i text field: ${optionData['option_text']} or ${optionData['text']}');
+
+                final option = QuestionOption.fromJson(optionData);
+                optionsList.add(option);
+                print('✅ Option $i parsed successfully: ${option.optionText}');
+              } else {
+                print('⚠️ Option $i is not a Map, it is: ${optionData.runtimeType}');
+              }
+            } catch (e, stackTrace) {
+              print('❌ Error parsing option $i: $e');
+              print('📋 Stack: $stackTrace');
+              print('📋 Option data: ${optionsData[i]}');
+            }
           }
+        } else {
+          print('⚠️ Options is not a List, it is: ${optionsData.runtimeType}');
         }
+      } else {
+        print('⚠️ NO OPTIONS FIELD IN JSON!');
       }
 
       // Parse da lógica condicional

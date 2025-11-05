@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter pub:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(flutter clean:*)",
+      "Bash(flutter build:*)",
+      "Bash(dir:*)",
+      "Bash(flutter test:*)",
+      "Bash(flutter run:*)",
+      "Bash(if exist \"linux\\flutter\\ephemeral\\.plugin_symlinks\" rmdir /s /q \"linux\\flutter\\ephemeral\\.plugin_symlinks\")",
+      "Bash(adb devices:*)",
+      "Bash(timeout /t 30 /nobreak)",
+      "Bash(adb install:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

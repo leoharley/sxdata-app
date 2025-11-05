@@ -71,7 +71,13 @@ class ProfileScreen extends StatelessWidget {
   Widget _buildProfileHeader(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.user;
-    
+
+    // Definir valores padrão caso o usuário não esteja disponível
+    final displayName = user?.fullName ?? 'Usuário';
+    final displayRole = user?.role == 'aplicador'
+        ? 'Aplicador de Campo'
+        : (user?.role == 'admin' ? 'Administrador' : 'Usuário');
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(30),
@@ -95,7 +101,7 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 15),
           Text(
-            user?.fullName ?? 'Usuário Offline',
+            displayName,
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
@@ -104,7 +110,7 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 5),
           Text(
-            user?.role == 'aplicador' ? 'Aplicador de Campo' : (user?.role ?? 'Offline'),
+            displayRole,
             style: const TextStyle(
               fontSize: 14,
               color: Color.fromRGBO(255, 255, 255, 0.9),

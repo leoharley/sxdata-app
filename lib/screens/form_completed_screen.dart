@@ -276,14 +276,25 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
 
   void _setupBasicInfo() {
     print('📋 Configurando informações básicas');
-    
+
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      _applicatorName = authProvider.user?.fullName ?? 'Usuário Offline';
+
+      // IMPORTANTE: Verificar se o usuário está disponível no AuthProvider
+      // Mesmo offline, o usuário deve estar carregado do armazenamento local
+      if (authProvider.user != null) {
+        _applicatorName = authProvider.user!.fullName;
+        print('✅ Usando usuário do AuthProvider: $_applicatorName');
+      } else {
+        // Apenas como fallback - não deve acontecer se o usuário estava logado
+        _applicatorName = 'Aplicador';
+        print('⚠️ Usuário não disponível no AuthProvider');
+      }
     } catch (e) {
-      _applicatorName = 'Usuário Offline';
+      print('❌ Erro ao obter usuário: $e');
+      _applicatorName = 'Aplicador';
     }
-    
+
     // Configurar localização
     if (_finalLocationName != null && _finalLocationName!.isNotEmpty) {
       _locationName = _finalLocationName!;
@@ -292,7 +303,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
     } else {
       _locationName = 'Localização não disponível';
     }
-    
+
     // Configurar foto
     if (_finalPhotoPath != null && _finalPhotoPath!.isNotEmpty) {
       final photoFile = File(_finalPhotoPath!);
@@ -301,10 +312,10 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
         print('📸 Foto encontrada: $_finalPhotoPath');
       }
     }
-    
+
     _completionTime = _finalCompletedAt ?? DateTime.now();
-    
-    print('📋 Informações básicas configuradas');
+
+    print('📋 Informações básicas configuradas - Aplicador: $_applicatorName');
   }
 
   Future<void> _submitFormData() async {
@@ -323,22 +334,40 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
     
     try {
       final formProvider = Provider.of<FormProvider>(context, listen: false);
-      
+
       // Se o FormProvider ainda tem um formulário ativo, usar submissão normal
+      //COMENTADO PARA EVITAR SALVAR 2 VEZES LEOHARLEY
+      // CORREÇÃO: Este bloco estava causando duplicação de formulários!
+      // O formulário já foi submetido no question_screen.dart quando clicou "Finalizar"
+      // NÃO deve submeter novamente aqui!
+      /*
       if (formProvider.currentForm != null) {
         print('📋 Usando submissão do FormProvider');
-        
+
+
         final success = await formProvider.submitFormWithPhoto(null);
-        
+
         setState(() {
           _hasSyncedSuccessfully = success;
-          _statusMessage = success 
-            ? 'Dados salvos com sucesso' 
+          _statusMessage = success
+            ? 'Dados salvos com sucesso'
             : 'Dados salvos localmente';
           _isSubmitting = false;
         });
-        
+
         _showSubmissionResult(success);
+        return;
+      }
+      */
+
+      // CORREÇÃO: Agora apenas exibe o formulário que já foi salvo
+      if (formProvider.currentForm != null) {
+        print('✅ Formulário já foi submetido anteriormente');
+        setState(() {
+          _hasSyncedSuccessfully = true;
+          _statusMessage = 'Formulário salvo com sucesso';
+          _isSubmitting = false;
+        });
         return;
       }
       
@@ -365,12 +394,14 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
       );
       
       // Salvar localmente
-      await LocalStorageService.saveFormResponse(formResponse);
+
+    //COMENTADO PARA EVITAR SALVAR 2 VEZES LEOHARLEY
+    //  await LocalStorageService.saveFormResponse(formResponse);
       
       print('✅ Formulário salvo localmente');
       
       // Tentar sincronizar com servidor
-      bool syncSuccess = false;
+    /*  bool syncSuccess = false;
       try {
         final result = await ApiService.submitForm(formResponse);
         if (result['success'] == true) {
@@ -380,18 +411,22 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
       } catch (e) {
         print('⚠️ Erro na sincronização (modo offline): $e');
         syncSuccess = false;
-      }
+      } 
       
       setState(() {
         _hasSyncedSuccessfully = syncSuccess;
-        _statusMessage = syncSuccess 
+        //COMENTADO PARA RESOLVER PROBLEMA DE SALVAR 2 VEZES
+        /*_statusMessage = syncSuccess 
           ? 'Dados sincronizados com sucesso' 
+          : 'Dados salvos localmente'; */
+          _statusMessage = syncSuccess 
+          ? 'Dados salvos localmente' 
           : 'Dados salvos localmente';
         _isSubmitting = false;
       });
       
       _showSubmissionResult(true); // Sempre true porque pelo menos salvou localmente
-      
+      */
     } catch (e, stackTrace) {
       print('❌ Erro na submissão: $e');
       print('📋 Stack trace: $stackTrace');
@@ -402,7 +437,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
         _isSubmitting = false;
       });
       
-      _showSubmissionResult(false);
+      _showSubmissionResult(false); 
     }
   }
 

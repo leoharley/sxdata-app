@@ -261,7 +261,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
       print('   - Consentimento: true');
       
       // CORREÇÃO: Usar startForm com 3 parâmetros (incluindo questions)
-      formProvider.startForm(questionnaireId, userId, questions);
+      formProvider.startForm(questionnaireId, authProvider.user!.id, questions);
       formProvider.setConsent(true);
       
       print('✅ FormProvider inicializado com sucesso');

@@ -24,26 +24,58 @@ class QuestionOption {
   }
 
   factory QuestionOption.fromJson(Map<String, dynamic> json) {
-    print('🔘 Parsing option: ${json['text']}');
-    print('📋 Option JSON: $json');
-    
+    print('🔘 === PARSING OPTION ===');
+    print('🔘 JSON keys: ${json.keys.toList()}');
+    print('🔘 Full JSON: $json');
+
     try {
+      // Detectar qual campo usar para o texto (pode vir como 'text' ou 'option_text')
+      String optionText = '';
+      if (json['option_text'] != null) {
+        optionText = json['option_text'].toString();
+        print('🔘 Using option_text: $optionText');
+      } else if (json['text'] != null) {
+        optionText = json['text'].toString();
+        print('🔘 Using text: $optionText');
+      } else {
+        print('⚠️ NO TEXT FIELD FOUND in option JSON!');
+      }
+
       // Tratar o valor da opção - se estiver vazio, usar o texto
-      String? optionValue = json['option_value']?.toString();
+      String? optionValue;
+      if (json['option_value'] != null) {
+        optionValue = json['option_value'].toString();
+        print('🔘 Found option_value: $optionValue');
+      } else if (json['value'] != null) {
+        optionValue = json['value'].toString();
+        print('🔘 Found value: $optionValue');
+      }
+
       if (optionValue != null && optionValue.trim().isEmpty) {
         optionValue = null; // Se for string vazia, usar null para usar o texto
+        print('🔘 option_value is empty, will use text');
+      }
+
+      // Detectar qual campo usar para order
+      int orderIndex = 0;
+      if (json['order_index'] != null) {
+        orderIndex = _parseInt(json['order_index']);
+        print('🔘 Using order_index: $orderIndex');
+      } else if (json['order'] != null) {
+        orderIndex = _parseInt(json['order']);
+        print('🔘 Using order: $orderIndex');
       }
 
       final option = QuestionOption(
         id: _parseInt(json['id']),
-        optionText: json['option_text']?.toString() ?? '',
+        optionText: optionText,
         optionValue: optionValue,
-        orderIndex: _parseInt(json['order_index']),
+        orderIndex: orderIndex,
       );
 
-      print('✅ Option parsed: ${option.optionText} (value: ${option.optionValue ?? 'using text'})');
+      print('✅ Option parsed successfully: "${option.optionText}" (value: ${option.optionValue ?? 'using text'})');
       return option;
-      
+
     } catch (e, stackTrace) {
       print('❌ Error in QuestionOption.fromJson: $e');
       print('📋 Stack trace: $stackTrace');
@@ -56,9 +88,9 @@ class QuestionOption {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'text': optionText,
-      'value': optionValue,
-      'order': orderIndex,
+      'option_text': optionText,
+      'option_value': optionValue,
+      'order_index': orderIndex,
     };
   }
 

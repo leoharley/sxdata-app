@@ -22,62 +22,90 @@ class AuthProvider with ChangeNotifier {
 
     try {
       if (kDebugMode) {
-        print('Starting login for user: $username');
+        print('🔐 === INICIANDO LOGIN ===');
+        print('👤 Usuário: $username');
       }
-      
-      final response = await ApiService.login(username, password);
-      
-      if (kDebugMode) {
-        print('Login response received: $response');
-        print('Success field: ${response['success']}');
-      }
-      
-      if (response.containsKey('success') && response['success'] == true) {
+
+      // Tentar login online primeiro
+      try {
+        final response = await ApiService.login(username, password);
+
         if (kDebugMode) {
-          print('Success validation passed');
+          print('📡 Resposta do servidor recebida');
+          print('✅ Success: ${response['success']}');
         }
-        
-        _isAuthenticated = true;
-        
-        // Processar dados do usuário
-        if (response.containsKey('user') && response['user'] != null) {
+
+        if (response.containsKey('success') && response['success'] == true) {
           if (kDebugMode) {
-            print('User data found: ${response['user']}');
+            print('✅ Login online bem-sucedido');
           }
-          
-          try {
-            _user = User.fromJson(response['user']);
+
+          _isAuthenticated = true;
+
+          // Processar dados do usuário
+          if (response.containsKey('user') && response['user'] != null) {
             if (kDebugMode) {
-              print('User object created successfully: ${_user?.id}');
+              print('📋 Dados do usuário encontrados');
             }
-          } catch (userError) {
-            if (kDebugMode) {
-              print('Error creating User object: $userError');
+
+            try {
+              _user = User.fromJson(response['user']);
+              if (kDebugMode) {
+                print('✅ Objeto User criado: ${_user?.id}');
+              }
+            } catch (userError) {
+              if (kDebugMode) {
+                print('❌ Erro ao criar User: $userError');
+              }
+              _user = null;
             }
-            _user = null;
+          }
+
+          // Salvar dados de autenticação E credenciais offline
+          await _saveAuthData(response);
+          await _saveOfflineCredentials(username, password);
+
+          notifyListeners();
+
+          if (kDebugMode) {
+            print('✅ === LOGIN ONLINE CONCLUÍDO COM SUCESSO ===');
+          }
+          return true;
+        } else {
+          // Login online falhou (credenciais inválidas)
+          if (kDebugMode) {
+            print('❌ Login online falhou - credenciais inválidas');
+            print('📝 Mensagem: ${response['message'] ?? 'Sem mensagem'}');
+          }
+          // Retorna false - não tenta offline se servidor respondeu que credenciais são inválidas
+          return false;
+        }
+      } catch (networkError) {
+        // Erro de rede - servidor não respondeu
+        if (kDebugMode) {
+          print('🌐 Erro de rede: $networkError');
+          print('🔄 Tentando login offline...');
+        }
+
+        // Tentar login offline quando não há conexão
+        final offlineResult = await _attemptOfflineLogin(username, password);
+
+        if (offlineResult) {
+          if (kDebugMode) {
+            print('✅ === LOGIN OFFLINE BEM-SUCEDIDO ===');
+          }
+        } else {
+          if (kDebugMode) {
+            print('❌ === LOGIN OFFLINE FALHOU ===');
           }
         }
-        
-        // Salvar dados de autenticação
-        await _saveAuthData(response);
-        
-        notifyListeners();
-        
-        if (kDebugMode) {
-          print('Login completed successfully');
-        }
-        return true;
-      } else {
-        if (kDebugMode) {
-          print('Login failed - success field is not true');
-          print('Message: ${response['message'] ?? 'No message provided'}');
-        }
-        return false;
+
+        return offlineResult;
       }
     } catch (e, stackTrace) {
       if (kDebugMode) {
-        print('Login error: $e');
-        print('Stack trace: $stackTrace');
+        print('❌ Erro inesperado no login: $e');
+        print('📋 Stack trace: $stackTrace');
       }
       return false;
     } finally {
@@ -86,11 +114,129 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  // Salvar credenciais offline (sem criptografia para simplificar)
+  Future<void> _saveOfflineCredentials(String username, String password) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      final saveUsername = await prefs.setString('offline_username', username);
+      final savePassword = await prefs.setString('offline_password', password);
+
+      if (kDebugMode) {
+        print('💾 === SALVANDO CREDENCIAIS OFFLINE ===');
+        print('📝 Username: $username - Resultado: $saveUsername');
+        print('📝 Password: ${password.length} caracteres - Resultado: $savePassword');
+
+        // Verificação imediata
+        final verifyUsername = prefs.getString('offline_username');
+        final verifyPassword = prefs.getString('offline_password');
+        print('✅ Verificação imediata:');
+        print('   Username recuperado: $verifyUsername');
+        print('   Password recuperado existe: ${verifyPassword != null} (${verifyPassword?.length ?? 0} chars)');
+
+        if (verifyUsername == username && verifyPassword == password) {
+          print('✅ === CREDENCIAIS OFFLINE SALVAS E VERIFICADAS COM SUCESSO ===');
+        } else {
+          print('❌ === ERRO: CREDENCIAIS NÃO FORAM SALVAS CORRETAMENTE ===');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erro ao salvar credenciais offline: $e');
+      }
+    }
+  }
+
+  // Tentar login offline
+  Future<bool> _attemptOfflineLogin(String username, String password) async {
+    try {
+      if (kDebugMode) {
+        print('🔍 === TENTANDO LOGIN OFFLINE ===');
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final savedUsername = prefs.getString('offline_username');
+      final savedPassword = prefs.getString('offline_password');
+
+      if (kDebugMode) {
+        print('📋 Username salvo: $savedUsername');
+        print('📋 Senha salva existe: ${savedPassword != null}');
+        print('📋 Username digitado: $username');
+        print('📋 Senha digitada existe: ${password.isNotEmpty}');
+      }
+
+      if (savedUsername == null || savedPassword == null) {
+        if (kDebugMode) {
+          print('❌ Nenhuma credencial offline salva');
+        }
+        return false;
+      }
+
+      // Verificar se o username corresponde
+      if (savedUsername != username) {
+        if (kDebugMode) {
+          print('❌ Usuário não corresponde ao salvo offline');
+          print('   Esperado: $savedUsername');
+          print('   Recebido: $username');
+        }
+        return false;
+      }
+
+      // Verificar se a senha corresponde
+      if (savedPassword != password) {
+        if (kDebugMode) {
+          print('❌ Senha incorreta para login offline');
+          print('   Esperado: ${savedPassword.substring(0, 2)}***');
+          print('   Recebido: ${password.substring(0, 2)}***');
+        }
+        return false;
+      }
+
+      if (kDebugMode) {
+        print('✅ Credenciais offline validadas!');
+        print('🔄 Carregando dados do usuário...');
+      }
+
+      // Carregar dados do usuário salvos
+      final userId = prefs.getInt('user_id');
+      if (kDebugMode) {
+        print('📋 User ID encontrado: $userId');
+      }
+
+      if (userId != null) {
+        await _loadSavedUserData(prefs, userId);
+      }
+
+      if (_user != null) {
+        _isAuthenticated = true;
+
+        if (kDebugMode) {
+          print('✅ === LOGIN OFFLINE BEM-SUCEDIDO ===');
+          print('👤 Usuário: ${_user!.fullName}');
+          print('📧 Email: ${_user!.email}');
+        }
+
+        notifyListeners();
+        return true;
+      } else {
+        if (kDebugMode) {
+          print('❌ Dados do usuário não encontrados para login offline');
+        }
+        return false;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erro durante login offline: $e');
+      }
+      return false;
+    }
+  }
+
   // Método privado para salvar dados de autenticação
   Future<void> _saveAuthData(Map<String, dynamic> response) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // Salvar token
       if (response.containsKey('token') && response['token'] != null) {
         await prefs.setString('auth_token', response['token']);
@@ -98,16 +244,25 @@ class AuthProvider with ChangeNotifier {
           print('Token saved: ${response['token'].toString().substring(0, 10)}...');
         }
       }
-      
-      // Salvar dados do usuário
+
+      // Salvar dados do usuário como JSON string para recuperação offline
       if (_user != null) {
         await prefs.setInt('user_id', _user!.id);
-        await prefs.setString('user_data', _user!.toJson().toString());
+        final userJsonString = '${_user!.toJson()}';
+        await prefs.setString('user_data', userJsonString);
+        await prefs.setString('user_full_name', _user!.fullName);
+        await prefs.setString('user_username', _user!.username);
+        await prefs.setString('user_email', _user!.email);
+        await prefs.setString('user_role', _user!.role);
+        await prefs.setBool('user_is_active', _user!.isActive);
+        if (kDebugMode) {
+          print('User data saved: ${_user!.fullName} (${_user!.username})');
+        }
       }
-      
+
       // Salvar timestamp do login
       await prefs.setInt('login_timestamp', DateTime.now().millisecondsSinceEpoch);
-      
+
       if (kDebugMode) {
         print('Auth data saved successfully');
       }
@@ -207,6 +362,12 @@ class AuthProvider with ChangeNotifier {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_data', _user!.toJson().toString());
+        await prefs.setInt('user_id', _user!.id);
+        await prefs.setString('user_full_name', _user!.fullName);
+        await prefs.setString('user_username', _user!.username);
+        await prefs.setString('user_email', _user!.email);
+        await prefs.setString('user_role', _user!.role);
+        await prefs.setBool('user_is_active', _user!.isActive);
       } catch (e) {
         if (kDebugMode) {
           print('Error saving updated user data: $e');
@@ -215,27 +376,47 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Logout manual - remove todos os dados
+  // Logout manual - remove apenas o token, MAS MANTÉM credenciais e dados do usuário para login offline
   Future<void> logout() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
+      // Remove apenas o token de autenticação
       await prefs.remove('auth_token');
-      await prefs.remove('user_id');
-      await prefs.remove('user_data');
       await prefs.remove('login_timestamp');
-      
+
+      // MANTÉM todos os dados do usuário e credenciais offline
+      // NÃO remove: user_id, user_data, user_full_name, user_username, user_email, user_role, user_is_active
+      // NÃO remove: offline_username, offline_password
+
       _user = null;
       _isAuthenticated = false;
-      
+
       if (kDebugMode) {
-        print('Manual logout completed');
+        print('✅ Logout completo - sessão encerrada');
+        print('📝 Credenciais E dados do usuário MANTIDOS para login offline futuro');
+
+        // Debug: verificar o que foi mantido
+        final savedUsername = prefs.getString('offline_username');
+        final savedPassword = prefs.getString('offline_password');
+        final userId = prefs.getInt('user_id');
+        final userFullName = prefs.getString('user_full_name');
+        final userEmail = prefs.getString('user_email');
+
+        print('   🔐 Credenciais mantidas:');
+        print('      Username: $savedUsername');
+        print('      Password: ${savedPassword != null ? "${savedPassword.length} chars" : "NULL"}');
+        print('   👤 Dados do usuário mantidos:');
+        print('      User ID: $userId');
+        print('      Nome: $userFullName');
+        print('      Email: $userEmail');
       }
     } catch (e) {
       if (kDebugMode) {
         print('Error during logout: $e');
       }
     }
-    
+
     notifyListeners();
   }
 
@@ -281,20 +462,39 @@ class AuthProvider with ChangeNotifier {
   // Carregar dados do usuário salvos localmente
   Future<void> _loadSavedUserData(SharedPreferences prefs, int userId) async {
     try {
-      final userData = prefs.getString('user_data');
-      if (userData != null) {
-        // Aqui você pode implementar a conversão de string para Map se necessário
-        // Por agora, vamos usar o userId para criar um usuário básico
+      // Tentar restaurar o usuário a partir dos dados salvos individualmente
+      final fullName = prefs.getString('user_full_name');
+      final username = prefs.getString('user_username');
+      final email = prefs.getString('user_email');
+      final role = prefs.getString('user_role');
+      final isActive = prefs.getBool('user_is_active');
+
+      if (fullName != null && username != null && email != null && role != null) {
+        // Criar objeto User com os dados salvos
+        _user = User(
+          id: userId,
+          fullName: fullName,
+          username: username,
+          email: email,
+          role: role,
+          isActive: isActive ?? true, // Default para true se não encontrado
+        );
         _isAuthenticated = true;
-        
+
         if (kDebugMode) {
-          print('User authenticated from saved data');
+          print('✅ User restored from saved data: ${_user!.fullName} (${_user!.username})');
         }
+      } else {
+        if (kDebugMode) {
+          print('⚠️ Incomplete user data in storage');
+        }
+        _isAuthenticated = false;
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error loading saved user data: $e');
+        print('❌ Error loading saved user data: $e');
       }
+      _isAuthenticated = false;
     }
   }
 
@@ -302,55 +502,40 @@ class AuthProvider with ChangeNotifier {
   Future<void> _verifyTokenWithServer(String token, SharedPreferences prefs) async {
     try {
       final response = await ApiService.verifyToken(token);
-      
+
       if (response.containsKey('success') && response['success'] == true) {
         if (kDebugMode) {
-          print('Token verified successfully with server');
+          print('✅ Token verificado com sucesso no servidor');
         }
-        
+
         // Atualizar dados do usuário se disponível
         if (response.containsKey('user') && response['user'] != null) {
           _user = User.fromJson(response['user']);
           await _saveUpdatedUserData();
         }
-        
+
         _isAuthenticated = true;
       } else {
-        // Token inválido no servidor - fazer logout
+        // Token inválido no servidor - NÃO fazer logout automático
+        // O usuário só perde a sessão ao clicar em "Sair"
         if (kDebugMode) {
-          print('Token invalid on server - logging out');
+          print('⚠️ Token inválido no servidor, mas mantendo sessão offline');
+          print('⚠️ Usuário permanece logado até fazer logout manual');
         }
-        await _clearAuthData(prefs);
-        _isAuthenticated = false;
+        // Mantém autenticado com dados locais
+        _isAuthenticated = true;
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error verifying token with server: $e');
-        print('Keeping user logged in due to network error');
+        print('⚠️ Erro ao verificar token com servidor: $e');
+        print('✅ Mantendo usuário logado com dados locais (modo offline)');
       }
       // Em caso de erro de rede, manter usuário logado
       // Não fazer logout automático
       if (_isAuthenticated) {
         if (kDebugMode) {
-          print('Maintaining authentication status due to network error');
+          print('✅ Sessão mantida mesmo sem conexão com servidor');
         }
-      }
-    }
-  }
-
-  // Limpar dados de autenticação
-  Future<void> _clearAuthData(SharedPreferences prefs) async {
-    try {
-      await prefs.remove('auth_token');
-      await prefs.remove('user_id');
-      await prefs.remove('user_data');
-      await prefs.remove('login_timestamp');
-      
-      _user = null;
-      _isAuthenticated = false;
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error clearing auth data: $e');
       }
     }
   }
@@ -358,14 +543,14 @@ class AuthProvider with ChangeNotifier {
   // Método para forçar re-verificação do token (opcional)
   Future<bool> refreshAuthStatus() async {
     if (!_isAuthenticated) return false;
-    
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-      
+
       if (token != null) {
         final response = await ApiService.verifyToken(token);
-        
+
         if (response.containsKey('success') && response['success'] == true) {
           return true;
         } else {
@@ -380,7 +565,34 @@ class AuthProvider with ChangeNotifier {
       // Manter logado em caso de erro de rede
       return true;
     }
-    
+
     return false;
+  }
+
+  // Método para debug - verificar credenciais salvas
+  Future<void> debugOfflineCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUsername = prefs.getString('offline_username');
+      final savedPassword = prefs.getString('offline_password');
+
+      if (kDebugMode) {
+        print('🔍 === DEBUG CREDENCIAIS OFFLINE ===');
+        print('📋 Username salvo: $savedUsername');
+        print('📋 Password salvo: ${savedPassword != null ? "${savedPassword.length} caracteres" : "NULL"}');
+        print('📋 User ID: ${prefs.getInt('user_id')}');
+        print('📋 User fullname: ${prefs.getString('user_full_name')}');
+        print('📋 User email: ${prefs.getString('user_email')}');
+
+        // Listar todas as chaves
+        final allKeys = prefs.getKeys();
+        print('📋 Todas as chaves salvas: $allKeys');
+        print('🔍 === FIM DEBUG ===');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erro no debug: $e');
+      }
+    }
   }
 }

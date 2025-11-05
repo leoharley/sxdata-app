@@ -10,10 +10,12 @@ class FormResponse {
   final double? longitude;
   final String? locationName;
   final String? photoPath;
+  final String? photoPath2;
   final bool consentGiven;
   final String syncStatus;
   final DateTime startedAt;
   final DateTime? completedAt;
+  final DateTime? editedAt;
   final List<QuestionResponse> responses;
 
   FormResponse({
@@ -26,10 +28,12 @@ class FormResponse {
     this.longitude,
     this.locationName,
     this.photoPath,
+    this.photoPath2,
     required this.consentGiven,
     this.syncStatus = 'pending',
     required this.startedAt,
     this.completedAt,
+    this.editedAt,
     this.responses = const [],
   });
 
@@ -44,10 +48,12 @@ class FormResponse {
     double? longitude,
     String? locationName,
     String? photoPath,
+    String? photoPath2,
     bool? consentGiven,
     String? syncStatus,
     DateTime? startedAt,
     DateTime? completedAt,
+    DateTime? editedAt,
     List<QuestionResponse>? responses,
   }) {
     return FormResponse(
@@ -60,10 +66,12 @@ class FormResponse {
       longitude: longitude ?? this.longitude,
       locationName: locationName ?? this.locationName,
       photoPath: photoPath ?? this.photoPath,
+      photoPath2: photoPath2 ?? this.photoPath2,
       consentGiven: consentGiven ?? this.consentGiven,
       syncStatus: syncStatus ?? this.syncStatus,
       startedAt: startedAt ?? this.startedAt,
       completedAt: completedAt ?? this.completedAt,
+      editedAt: editedAt ?? this.editedAt,
       responses: responses ?? this.responses,
     );
   }
@@ -80,11 +88,15 @@ class FormResponse {
         longitude: json['longitude'] as double?,
         locationName: json['location_name'] as String?,
         photoPath: json['photo_path'] as String?,
+        photoPath2: json['photo_path_2'] as String?,
         consentGiven: json['consent_given'] as bool? ?? false,
         syncStatus: json['sync_status'] as String? ?? 'pending',
         startedAt: DateTime.parse(json['started_at'] as String),
-        completedAt: json['completed_at'] != null 
-            ? DateTime.parse(json['completed_at'] as String) 
+        completedAt: json['completed_at'] != null
+            ? DateTime.parse(json['completed_at'] as String)
+            : null,
+        editedAt: json['edited_at'] != null
+            ? DateTime.parse(json['edited_at'] as String)
             : null,
         responses: (json['responses'] as List<dynamic>?)
             ?.map((r) => QuestionResponse.fromJson(r as Map<String, dynamic>))
@@ -110,10 +122,12 @@ class FormResponse {
         'longitude': longitude,
         'location_name': locationName,
         'photo_path': photoPath,
+        'photo_path_2': photoPath2,
         'consent_given': consentGiven,
         'sync_status': syncStatus,
         'started_at': startedAt.toIso8601String(),
         'completed_at': completedAt?.toIso8601String(),
+        'edited_at': editedAt?.toIso8601String(),
         'responses': responses.map((r) => r.toJson()).toList(),
       };
     } catch (e, stackTrace) {
