@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 
@@ -15,6 +16,89 @@ class AuthProvider with ChangeNotifier {
   bool get hasUser => _user != null;
   bool get isInitialized => _isInitialized;
   String? get userToken => null;
+
+  /// Verifica se o app foi atualizado e força logout se necessário
+  Future<bool> _checkAppVersionAndForceLogoutIfUpdated() async {
+    print('🔍 ========================================');
+    print('🔍 INICIANDO VERIFICAÇÃO DE VERSÃO DO APP');
+    print('🔍 ========================================');
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      print('📦 Obtendo informações do pacote...');
+      final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+
+      // Versão completa: version+buildNumber (ex: 1.0.0+1)
+      final String currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+      final String? savedVersion = prefs.getString('app_version');
+
+      print('🔍 === VERIFICANDO VERSÃO DO APP ===');
+      print('📱 Versão atual do APK: $currentVersion');
+      print('📱 packageInfo.version: ${packageInfo.version}');
+      print('📱 packageInfo.buildNumber: ${packageInfo.buildNumber}');
+      print('💾 Versão salva em SharedPreferences: $savedVersion');
+      print('🔍 ========================================');
+
+      if (savedVersion == null) {
+        // Primeira instalação - salvar versão atual
+        print('⚠️ PRIMEIRA INSTALAÇÃO DETECTADA');
+        print('💾 Salvando versão atual: $currentVersion');
+        await prefs.setString('app_version', currentVersion);
+        print('✅ Versão salva com sucesso');
+        return false; // Não houve atualização
+      }
+
+      print('🔍 Comparando versões...');
+      print('   Salva: "$savedVersion"');
+      print('   Atual: "$currentVersion"');
+      print('   São iguais? ${savedVersion == currentVersion}');
+
+      if (savedVersion != currentVersion) {
+        // APP FOI ATUALIZADO - Forçar logout
+        print('🆕 ========================================');
+        print('🆕 === APP ATUALIZADO DETECTADO!!! ===');
+        print('🆕 ========================================');
+        print('📱 Versão anterior: $savedVersion');
+        print('📱 Nova versão: $currentVersion');
+        print('🚪 Forçando logout por segurança...');
+        print('🆕 ========================================');
+
+        // Fazer logout completo (limpar token)
+        print('🧹 Removendo auth_token...');
+        await prefs.remove('auth_token');
+        print('🧹 Removendo login_timestamp...');
+        await prefs.remove('login_timestamp');
+
+        // Atualizar versão salva
+        print('💾 Atualizando versão salva para: $currentVersion');
+        await prefs.setString('app_version', currentVersion);
+
+        // Verificar se salvou
+        final String? verificacao = prefs.getString('app_version');
+        print('✅ Verificação: versão salva agora é: $verificacao');
+
+        // Resetar estado de autenticação
+        _isAuthenticated = false;
+        _user = null;
+
+        print('✅ Logout forçado concluído!');
+        print('🆕 ========================================');
+
+        return true; // Houve atualização e logout
+      }
+
+      print('✅ Mesma versão - sem necessidade de logout');
+      return false; // Não houve atualização
+
+    } catch (e, stackTrace) {
+      print('❌ ========================================');
+      print('❌ ERRO ao verificar versão do app: $e');
+      print('📋 Stack trace: $stackTrace');
+      print('❌ ========================================');
+      return false;
+    }
+  }
 
   Future<bool> login(String username, String password) async {
     _isLoading = true;
@@ -427,10 +511,26 @@ class AuthProvider with ChangeNotifier {
     }
 
     try {
+      // PRIMEIRO: Verificar se o app foi atualizado e forçar logout se necessário
+      final bool wasUpdated = await _checkAppVersionAndForceLogoutIfUpdated();
+
+      if (wasUpdated) {
+        // App foi atualizado e logout foi forçado
+        _isAuthenticated = false;
+        _user = null;
+        _isInitialized = true;
+        notifyListeners();
+
+        if (kDebugMode) {
+          print('🆕 App atualizado - usuário deslogado automaticamente');
+        }
+        return; // Encerra aqui, usuário precisa fazer login novamente
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
       final userId = prefs.getInt('user_id');
-      
+
       if (token != null && userId != null) {
         if (kDebugMode) {
           print('Found saved token and user ID');

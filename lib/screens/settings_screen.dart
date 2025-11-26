@@ -1,6 +1,7 @@
 // screens/settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/photo_storage_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -182,6 +183,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'Tentar sincronizar todos os dados',
                           Icons.sync,
                           () => _forceSync(),
+                        ),
+                        _buildActionItem(
+                          'Reenviar Fotos',
+                          'Forçar upload de fotos pendentes para FTP',
+                          Icons.cloud_upload,
+                          () => _forcePhotoUpload(),
                         ),
                       ],
                     ),
@@ -504,6 +511,145 @@ class _SettingsScreenState extends State<SettingsScreen> {
         content: Text('Sincronização iniciada em segundo plano'),
       ),
     );
+  }
+
+  Future<void> _forcePhotoUpload() async {
+    try {
+      // Mostrar dialog de confirmação
+      final bool? confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Reenviar Fotos'),
+          content: const Text(
+            'Isso irá buscar TODAS as fotos salvas localmente e tentar enviá-las novamente para o servidor FTP.\n\n'
+            'Certifique-se de estar conectado à internet.\n\n'
+            'Continuar?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Reenviar'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      if (!mounted) return;
+
+      // Mostrar dialog de progresso para buscar fotos
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => WillPopScope(
+          onWillPop: () async => false,
+          child: const AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 20),
+                Text('Buscando fotos locais...'),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      // PASSO 1: Resetar TODAS as fotos para status 'pending'
+      final int resetCount = await PhotoStorageService.resetAllPhotosToPending();
+
+      if (!mounted) return;
+      Navigator.pop(context); // Fechar dialog de progresso
+
+      if (resetCount == 0) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Nenhuma foto encontrada no dispositivo'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      // Mostrar dialog de progresso para upload
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 20),
+                Text('Enviando $resetCount foto${resetCount > 1 ? 's' : ''}...'),
+                const SizedBox(height: 10),
+                const Text(
+                  'Isso pode levar alguns minutos',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      // PASSO 2: Sincronizar fotos (agora todas estão com status 'pending')
+      final int syncedCount = await PhotoStorageService.syncPendingPhotos();
+
+      if (!mounted) return;
+      Navigator.pop(context); // Fechar dialog de progresso
+
+      // Mostrar resultado
+      if (!mounted) return;
+      if (syncedCount > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              syncedCount == resetCount
+                  ? 'Todas as $syncedCount foto${syncedCount > 1 ? 's foram' : ' foi'} enviada${syncedCount > 1 ? 's' : ''} com sucesso!'
+                  : '$syncedCount de $resetCount foto${syncedCount > 1 ? 's foram' : ' foi'} enviada${syncedCount > 1 ? 's' : ''}',
+            ),
+            backgroundColor: syncedCount == resetCount
+                ? const Color(0xFF8fae5d)
+                : Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao enviar fotos. Verifique sua conexão com a internet.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Erro ao forçar upload de fotos: $e');
+
+      if (!mounted) return;
+
+      // Fechar qualquer dialog aberto
+      Navigator.of(context).popUntil((route) => route.isFirst || !route.navigator!.canPop());
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao enviar fotos: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   void _showPrivacyPolicy() {

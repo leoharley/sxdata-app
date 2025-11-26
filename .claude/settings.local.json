@@ -11,7 +11,11 @@
       "Bash(if exist \"linux\\flutter\\ephemeral\\.plugin_symlinks\" rmdir /s /q \"linux\\flutter\\ephemeral\\.plugin_symlinks\")",
       "Bash(adb devices:*)",
       "Bash(timeout /t 30 /nobreak)",
-      "Bash(adb install:*)"
+      "Bash(adb install:*)",
+      "Bash(adb logcat:*)",
+      "Bash(.ver_logs.bat)",
+      "Bash(timeout /t 10 /nobreak)",
+      "Bash(aapt dump badging:*)"
     ],
     "deny": [],
     "ask": []

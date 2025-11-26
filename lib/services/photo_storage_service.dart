@@ -389,6 +389,61 @@ class PhotoStorageService {
     }
   }
 
+  /// Redefine o status de TODAS as fotos para 'pending' (para forçar reenvio)
+  static Future<int> resetAllPhotosToPending() async {
+    try {
+      print('🔄 === REDEFININDO TODAS AS FOTOS PARA PENDENTE ===');
+
+      final prefs = await SharedPreferences.getInstance();
+      final String? data = prefs.getString(_photosMetadataKey);
+
+      if (data == null) {
+        print('📸 Nenhuma foto encontrada');
+        return 0;
+      }
+
+      final List<dynamic> photosList = jsonDecode(data);
+      final List<Map<String, dynamic>> photosMetadata = photosList.cast<Map<String, dynamic>>();
+
+      int resetCount = 0;
+
+      // Redefinir todas as fotos para 'pending' se o arquivo ainda existir
+      for (final photo in photosMetadata) {
+        final String localPath = photo['localPath'];
+        final File photoFile = File(localPath);
+
+        if (await photoFile.exists()) {
+          // Só redefine se o arquivo existe
+          photo['syncStatus'] = 'pending';
+          photo['resetAt'] = DateTime.now().toIso8601String();
+
+          // Remover mensagem de erro anterior se houver
+          photo.remove('errorMessage');
+          photo.remove('syncedAt');
+
+          resetCount++;
+          print('🔄 Foto ${photo['filename']} redefinida para pendente');
+        } else {
+          // Se arquivo não existe, marcar como erro
+          photo['syncStatus'] = 'error';
+          photo['errorMessage'] = 'Arquivo não encontrado no dispositivo';
+          print('❌ Foto ${photo['filename']} não encontrada: $localPath');
+        }
+      }
+
+      // Salvar metadados atualizados
+      await prefs.setString(_photosMetadataKey, jsonEncode(photosMetadata));
+
+      print('✅ $resetCount fotos redefinidas para pendente');
+      return resetCount;
+
+    } catch (e, stackTrace) {
+      print('❌ Erro ao redefinir status das fotos: $e');
+      print('📋 Stack trace: $stackTrace');
+      return 0;
+    }
+  }
+
   /// Sincroniza todas as fotos pendentes com o servidor
   static Future<int> syncPendingPhotos() async {
     try {
