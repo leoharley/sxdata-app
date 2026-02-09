@@ -1,6 +1,6 @@
 {
-    "name": "sxdata",
-    "short_name": "sxdata",
+    "name": "AppColeta",
+    "short_name": "AppColeta",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

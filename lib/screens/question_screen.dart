@@ -346,7 +346,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
   return Container(
     width: double.infinity,
     padding: const EdgeInsets.all(20),
-    decoration: const BoxDecoration(color: Color.fromRGBO(35, 52, 95, 1.0)),
+    decoration: const BoxDecoration(color: Color(0xFFF5F5F5)),
     child: Row(
       children: [
         // Espaço vazio à esquerda
@@ -354,7 +354,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
         
         // Imagem centralizada
         Image.asset(
-          'assets/images/Logo_verde2.png',
+          'assets/images/logo_alveslima.png',
           width: 120,
           fit: BoxFit.contain,
         ),
@@ -740,6 +740,16 @@ class _QuestionScreenState extends State<QuestionScreen> {
 }
 
   void _navigateToCompletedScreen() {
+    // Se está em modo de edição, apenas voltar para a tela anterior
+    // indicando que a edição foi bem-sucedida
+    final formProvider = Provider.of<FormProvider>(context, listen: false);
+    if (formProvider.isEditMode) {
+      print('✅ Modo de edição - voltando para tela anterior com sucesso');
+      Navigator.pop(context, true); // Retorna true indicando sucesso
+      return;
+    }
+
+    // Se não está em modo de edição, navegar para a tela de conclusão
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(

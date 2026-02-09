@@ -1552,7 +1552,7 @@ Future<void> _requestPermissions() async {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: const BoxDecoration(
-                color: Color.fromRGBO(35, 52, 95, 1.0),
+                color: Color(0xFFF5F5F5),
               ),
               child: Column(
                 children: [
@@ -1568,8 +1568,8 @@ Future<void> _requestPermissions() async {
                         ),
                       ),
                       Image.asset(
-                        'assets/images/Logo_verde2.png',
-                        width: 120,             
+                        'assets/images/logo_alveslima.png',
+                        width: 120,
                         fit: BoxFit.contain,
                       ),
                       Row(

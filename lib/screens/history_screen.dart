@@ -4,6 +4,7 @@ import '../providers/history_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/form_provider.dart';
 import '../services/local_storage_service.dart';
+import '../models/form_response.dart';
 import 'question_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -113,7 +114,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: const BoxDecoration(
-                color: Color.fromRGBO(35, 52, 95, 1.0),
+                color: Color(0xFFF5F5F5),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -123,13 +124,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(
                       Icons.arrow_back,
-                      color: Colors.white,
+                      color: Color(0xFF23345F),
                       size: 24,
                     ),
                   ),
                   // Logo centralizado
                   Image.asset(
-                    'assets/images/Logo_verde2.png',
+                    'assets/images/logo_alveslima.png',
                     width: 120,             
                     fit: BoxFit.contain,
                   ),
@@ -624,15 +625,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
                   ),
                 ),
-                // Botão de editar
-                IconButton(
-                  onPressed: () => _onEditApplication(application),
-                  icon: const Icon(
-                    Icons.edit,
-                    color: Color(0xFF8fae5d),
+                // Botão de editar - apenas para formulários pendentes
+                if (application.sync.status != 'synced' && application.sync.status != 'Sincronizado')
+                  IconButton(
+                    onPressed: () => _onEditApplication(application),
+                    icon: const Icon(
+                      Icons.edit,
+                      color: Color(0xFF8fae5d),
+                    ),
+                    tooltip: 'Editar questionário',
                   ),
-                  tooltip: 'Editar questionário',
-                ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
@@ -862,72 +864,77 @@ class _HistoryScreenState extends State<HistoryScreen> {
     print('📝 === INICIANDO EDIÇÃO DE APLICAÇÃO ===');
     print('📋 Application ID: ${application.id}');
     print('📋 Questionário: ${application.questionnaire.title}');
+    print('📋 Status de Sincronização: ${application.sync.status}');
 
     // Fechar o modal de detalhes
     Navigator.pop(context);
 
-    // Mostrar indicador de carregamento
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8fae5d)),
-                ),
-                SizedBox(height: 16),
-                Text('Carregando questionário...'),
-              ],
+    // Verificar se o formulário já foi sincronizado
+    if (application.sync.status == 'synced' || application.sync.status == 'Sincronizado') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Não é possível editar formulários já sincronizados.\n'
+              'Apenas formulários pendentes podem ser editados.'
             ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
           ),
-        ),
-      ),
-    );
+        );
+      }
+      return;
+    }
 
     try {
-      // Carregar o formulário completo do storage local
-      final formResponse = await LocalStorageService.getFormResponseById(
-        application.id,
-      );
+      // Buscar formulário usando estratégia otimizada
+      final formResponse = await _findFormResponse(application);
 
       if (formResponse == null) {
-        // Fechar indicador de carregamento
-        if (mounted) Navigator.pop(context);
-
         // Mostrar erro
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Formulário não encontrado localmente'),
+              content: Text(
+                'Formulário não encontrado localmente.\n'
+                'Pode ter sido removido ou ainda não sincronizado.'
+              ),
               backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
             ),
           );
         }
         return;
       }
 
-      // Carregar questionário do storage local
+      print('✅ Formulário encontrado: ID=${formResponse.id}, QuestionnaireID=${formResponse.questionnaireId}');
+
+      // Mostrar loader enquanto carrega questionário
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8fae5d)),
+          ),
+        ),
+      );
+
+      // Carregar questionário
       final questionnaires = await LocalStorageService.getQuestionnaires();
       final questionnaire = questionnaires.firstWhere(
         (q) => q.id == application.questionnaire.id,
         orElse: () => throw Exception('Questionário não encontrado'),
       );
 
-      // Fechar indicador de carregamento
+      // Fechar loader
       if (mounted) Navigator.pop(context);
 
-      // Obter o FormProvider
+      // Configurar FormProvider e navegar
       final formProvider = context.read<FormProvider>();
-
-      // Carregar o formulário para edição no FormProvider
+      formProvider.setEditMode(formResponse.id.toString());
       formProvider.loadFormForEdit(formResponse, questionnaire);
 
-      // Navegar para a tela de questões em modo de edição
       if (mounted) {
         final result = await Navigator.push(
           context,
@@ -939,7 +946,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         );
 
-        // Se o formulário foi editado e salvo, recarregar o histórico
+        formProvider.clearEditMode();
+
         if (result == true && mounted) {
           await _onRefresh();
         }
@@ -948,10 +956,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
       print('❌ Erro ao carregar formulário para edição: $e');
       print('📋 Stack trace: $stackTrace');
 
-      // Fechar indicador de carregamento
-      if (mounted) Navigator.pop(context);
-
-      // Mostrar erro
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -962,4 +966,82 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
     }
   }
+
+  /// Buscar FormResponse usando estratégia inteligente e otimizada
+  Future<FormResponse?> _findFormResponse(ApplicationHistory application) async {
+    print('🔍 === BUSCANDO FORMULÁRIO ===');
+    print('📋 Application ID: ${application.id}');
+    print('📋 Questionário ID: ${application.questionnaire.id}');
+
+    // ESTRATÉGIA 1: Tentar buscar diretamente por ID (mais rápido)
+    final directForm = await LocalStorageService.getFormResponseById(application.id);
+    if (directForm != null) {
+      print('✅ Formulário encontrado por ID direto');
+      return directForm;
+    }
+
+    print('⚠️ Não encontrado por ID direto, buscando por critérios alternativos...');
+
+    // ESTRATÉGIA 2: Carregar todos e buscar por questionário + timestamp
+    final allForms = await LocalStorageService.getFormResponses();
+    print('📋 Total de formulários locais: ${allForms.length}');
+
+    // Parse do timestamp da aplicação
+    DateTime? applicationTime;
+    if (application.timing.completedAt != null) {
+      try {
+        applicationTime = DateTime.parse(application.timing.completedAt!);
+      } catch (e) {
+        print('⚠️ Erro ao parsear data: $e');
+      }
+    }
+
+    // Buscar formulários do mesmo questionário
+    final candidateForms = allForms.where((form) {
+      return form.questionnaireId == application.questionnaire.id;
+    }).toList();
+
+    print('📋 ${candidateForms.length} formulários candidatos do questionário ${application.questionnaire.id}');
+
+    if (candidateForms.isEmpty) {
+      print('❌ Nenhum formulário candidato encontrado');
+      return null;
+    }
+
+    // Se temos um timestamp, buscar o mais próximo
+    if (applicationTime != null) {
+      candidateForms.sort((a, b) {
+        final timeA = a.completedAt ?? a.startedAt;
+        final timeB = b.completedAt ?? b.startedAt;
+
+        final diffA = timeA.difference(applicationTime!).abs();
+        final diffB = timeB.difference(applicationTime).abs();
+
+        return diffA.compareTo(diffB);
+      });
+
+      final closestForm = candidateForms.first;
+      final closestTime = closestForm.completedAt ?? closestForm.startedAt;
+      final timeDiff = closestTime.difference(applicationTime).abs();
+
+      print('📋 Formulário mais próximo: diff=${timeDiff.inSeconds}s');
+
+      // Aceitar até 10 minutos de diferença (mais tolerante)
+      if (timeDiff.inMinutes <= 10) {
+        print('✅ Formulário encontrado por proximidade de timestamp');
+        return closestForm;
+      }
+    }
+
+    // ESTRATÉGIA 3: Pegar o mais recente do questionário
+    candidateForms.sort((a, b) {
+      final dateA = a.completedAt ?? a.startedAt;
+      final dateB = b.completedAt ?? b.startedAt;
+      return dateB.compareTo(dateA);
+    });
+
+    print('✅ Usando formulário mais recente do questionário');
+    return candidateForms.first;
+  }
+
 }

@@ -83,7 +83,7 @@ class _SplashScreenState extends State<SplashScreen> {
             children: [
               // Logo principal SOCIAL
               Image.asset(
-                'assets/images/Logo_verde2.png',
+                'assets/images/logo_alveslima.png',
                 width: 200,
                 fit: BoxFit.contain,
               ),
@@ -91,7 +91,7 @@ class _SplashScreenState extends State<SplashScreen> {
               
               // X logo
               Image.asset(
-                'assets/images/X.png',
+                'assets/images/icone_alveslima.png',
                 width: 80,
                 fit: BoxFit.contain,
               ),
@@ -143,7 +143,7 @@ class _SplashScreenState extends State<SplashScreen> {
               
               // Versão (posicionada mais baixo)
               const Text(
-                'Versão: 1.9.9',
+                'Versão: 2.0',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.white54,

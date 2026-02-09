@@ -28,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: const BoxDecoration(
-                  color: Color.fromRGBO(35, 52, 95, 1.0),
+                  color: Color(0xFFF5F5F5),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -37,8 +37,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     Row(
                       children: [
                         Image.asset(
-                          'assets/images/Logo_verde2.png',
-                          width: 120,             
+                          'assets/images/logo_alveslima.png',
+                          width: 180,
                           fit: BoxFit.contain,
                         ),
                       ],
@@ -57,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const SizedBox(height: 40),
                       const Text(
-                        'Bem-vindo ao SXData',
+                        'Bem-vindo ao AppColeta',
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -147,31 +147,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const SizedBox(height: 20),
 
-                      // Botão de debug (temporário)
-                      Consumer<AuthProvider>(
-                        builder: (context, authProvider, child) {
-                          return TextButton(
-                            onPressed: () async {
-                              final messenger = ScaffoldMessenger.of(context);
-                              await authProvider.debugOfflineCredentials();
-                              messenger.showSnackBar(
-                                const SnackBar(
-                                  content: Text('Veja o console para detalhes das credenciais'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                            child: const Text(
-                              'Debug Credenciais Offline',
-                              style: TextStyle(fontSize: 10, color: Colors.grey),
-                            ),
-                          );
-                        },
-                      ),
-
                       const SizedBox(height: 10),
                       const Text(
-                        'Versão: 1.9.9',
+                        'Versão: 2.0',
                         style: TextStyle(
                           fontSize: 12,
                           color: Color.fromARGB(255, 145, 145, 145),

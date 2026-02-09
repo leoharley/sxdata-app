@@ -36,7 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: const BoxDecoration(
-                color: Color.fromRGBO(35, 52, 95, 1.0),
+                color: Color(0xFFF5F5F5),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -46,13 +46,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(
                       Icons.arrow_back,
-                      color: Colors.white,
+                      color: Color(0xFF23345F),
                       size: 24,
                     ),
                   ),
                   // Logo centralizado
                   Image.asset(
-                    'assets/images/Logo_verde2.png',
+                    'assets/images/logo_alveslima.png',
                     width: 120,             
                     fit: BoxFit.contain,
                   ),

@@ -18,7 +18,7 @@ void main() {
   // Inicializar configurações conforme a plataforma
   _initializePlatform();
   
-  runApp(const SXDataApp());
+  runApp(const AppColetaApp());
 }
 
 void _initializePlatform() {
@@ -34,8 +34,8 @@ void _initializePlatform() {
   }
 }
 
-class SXDataApp extends StatelessWidget {
-  const SXDataApp({super.key});
+class AppColetaApp extends StatelessWidget {
+  const AppColetaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +49,7 @@ class SXDataApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => QuestionAnalysisProvider()),
       ],
       child: MaterialApp(
-        title: 'SXData',
+        title: 'AppColeta',
         theme: AppTheme.lightTheme,
         locale: const Locale('pt', 'BR'),
         localizationsDelegates: const [

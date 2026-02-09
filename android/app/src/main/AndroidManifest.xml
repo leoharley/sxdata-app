@@ -31,7 +31,7 @@
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
     <application
-        android:label="SXData"
+        android:label="AppColeta"
         android:name="${applicationName}"
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true"

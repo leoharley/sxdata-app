@@ -396,7 +396,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: const BoxDecoration(
-                color: Color.fromRGBO(35, 52, 95, 1.0),
+                color: Color(0xFFF5F5F5),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
