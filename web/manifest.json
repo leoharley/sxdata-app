@@ -1,6 +1,6 @@
 {
-    "name": "AppColeta",
-    "short_name": "AppColeta",
+    "name": "appcoleta",
+    "short_name": "appcoleta",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

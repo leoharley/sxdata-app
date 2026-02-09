@@ -15,8 +15,12 @@
       "Bash(adb logcat:*)",
       "Bash(.ver_logs.bat)",
       "Bash(timeout /t 10 /nobreak)",
+<<<<<<< HEAD
       "Bash(aapt dump badging:*)",
       "Bash(dart run:*)"
+=======
+      "Bash(aapt dump badging:*)"
+>>>>>>> 3138e706a7da9103c54400b093695bb544a3766e
     ],
     "deny": [],
     "ask": []
