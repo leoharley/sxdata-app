@@ -237,16 +237,16 @@ class QuestionInsightsWidget extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 6),
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: const Color(0xFF8fae5d).withOpacity(0.05),
+            color: const Color(0xFFE8962E).withOpacity(0.05),
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: const Color(0xFF8fae5d).withOpacity(0.2)),
+            border: Border.all(color: const Color(0xFFE8962E).withOpacity(0.2)),
           ),
           child: Row(
             children: [
               const Icon(
                 Icons.tips_and_updates,
                 size: 14,
-                color: Color(0xFF8fae5d),
+                color: Color(0xFFE8962E),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -614,7 +614,7 @@ class QuestionInsightsWidget extends StatelessWidget {
   }
 
   Color _getCompletionColor(double rate) {
-    if (rate >= 80) return Colors.green;
+    if (rate >= 80) return const Color(0xFFE8962E);
     if (rate >= 60) return Colors.orange;
     return Colors.red;
   }
@@ -644,7 +644,7 @@ class QuestionInsightsWidget extends StatelessWidget {
   Color _getEngagementColor(EngagementLevel level) {
     switch (level) {
       case EngagementLevel.high:
-        return Colors.green;
+        return const Color(0xFFE8962E);
       case EngagementLevel.medium:
         return Colors.orange;
       case EngagementLevel.low:
@@ -659,7 +659,7 @@ class QuestionInsightsWidget extends StatelessWidget {
   }
 
   Color _getQualityColor(double score) {
-    if (score >= 70) return Colors.green;
+    if (score >= 70) return const Color(0xFFE8962E);
     if (score >= 50) return Colors.orange;
     return Colors.red;
   }
@@ -674,7 +674,7 @@ class QuestionInsight {
 }
 
 enum InsightType {
-  positive(Icons.check_circle, Colors.green),
+  positive(Icons.check_circle, const Color(0xFFE8962E)),
   warning(Icons.warning, Colors.orange),
   info(Icons.info, Colors.blue),
   negative(Icons.error, Colors.red);

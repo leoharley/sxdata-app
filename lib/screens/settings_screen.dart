@@ -59,7 +59,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // Ícone de configurações
                   const Icon(
                     Icons.settings,
-                    color: Color(0xFF8fae5d),
+                    color: Color(0xFFE8962E),
                     size: 24,
                   ),
                 ],
@@ -284,7 +284,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               width: 50,
               height: 28,
               decoration: BoxDecoration(
-                color: value ? const Color(0xFF8fae5d) : Colors.grey.shade300,
+                color: value ? const Color(0xFFE8962E) : Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: AnimatedAlign(
@@ -339,13 +339,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8fae5d).withOpacity(0.1),
+                  color: const Color(0xFFE8962E).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   icon,
                   size: 20,
-                  color: const Color(0xFF8fae5d),
+                  color: const Color(0xFFE8962E),
                 ),
               ),
               const SizedBox(width: 15),
@@ -620,7 +620,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   : '$syncedCount de $resetCount foto${syncedCount > 1 ? 's foram' : ' foi'} enviada${syncedCount > 1 ? 's' : ''}',
             ),
             backgroundColor: syncedCount == resetCount
-                ? const Color(0xFF8fae5d)
+                ? const Color(0xFFE8962E)
                 : Colors.orange,
             duration: const Duration(seconds: 4),
           ),

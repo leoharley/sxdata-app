@@ -26,24 +26,16 @@ class _LoginScreenState extends State<LoginScreen> {
               // Header
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.only(top: 50, left: 20, right: 20, bottom: 20),
                 decoration: const BoxDecoration(
                   color: Color(0xFFF5F5F5),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Logo SOCIAL + X
-                    Row(
-                      children: [
-                        Image.asset(
-                          'assets/images/logo_alveslima.png',
-                          width: 180,
-                          fit: BoxFit.contain,
-                        ),
-                      ],
-                    ),
-                  ],
+                child: Center(
+                  child: Image.asset(
+                    'assets/images/logo_alveslima.png',
+                    width: 240,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
               
@@ -55,7 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 15),
                       const Text(
                         'Bem-vindo ao AppColeta',
                         style: TextStyle(
@@ -70,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         'Faça login para continuar',
                         style: TextStyle(
                           fontSize: 16,
-                          color: Color(0xFF8fae5d),
+                          color: Color(0xFFE8962E),
                         ),
                         textAlign: TextAlign.center,
                       ),

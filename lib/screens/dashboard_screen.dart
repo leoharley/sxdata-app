@@ -382,14 +382,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   decoration: BoxDecoration(
                     color: totalPendingItems > 0
                         ? Colors.orange.withOpacity(0.1)
-                        : Colors.green.withOpacity(0.1),
+                        : const Color(0xFFE8962E).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     totalPendingItems > 0
                         ? Icons.cloud_upload_outlined
                         : Icons.cloud_done_outlined,
-                    color: totalPendingItems > 0 ? Colors.orange : Colors.green,
+                    color: totalPendingItems > 0 ? Colors.orange : const Color(0xFFE8962E),
                     size: 20,
                   ),
                 ),
@@ -436,7 +436,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     decoration: BoxDecoration(
                       color: totalPendingItems > 0
                           ? Colors.orange.withOpacity(0.1)
-                          : Colors.green.withOpacity(0.1),
+                          : const Color(0xFFE8962E).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -446,7 +446,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         fontWeight: FontWeight.bold,
                         color: totalPendingItems > 0
                             ? Colors.orange
-                            : Colors.green,
+                            : const Color(0xFFE8962E),
                       ),
                     ),
                   ),
@@ -506,7 +506,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           'Ver todos os formulários (${_pendingForms.length})',
                           style: const TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF8fae5d),
+                            color: Color(0xFFE8962E),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -514,7 +514,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         const Icon(
                           Icons.keyboard_arrow_down,
                           size: 16,
-                          color: Color(0xFF8fae5d),
+                          color: Color(0xFFE8962E),
                         ),
                       ],
                     ),
@@ -556,7 +556,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                               if (formsResult > 0) {
                                 message = 'Sincronização concluída! $formsResult ${formsResult == 1 ? 'item sincronizado' : 'itens sincronizados'}';
-                                color = Colors.green;
+                                color = const Color(0xFFE8962E);
                               } else {
                                 message = 'Nenhum item foi sincronizado. Verifique sua conexão com a internet.';
                                 color = Colors.orange;
@@ -615,7 +615,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF8fae5d),
+                    backgroundColor: const Color(0xFFE8962E),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -752,7 +752,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           SnackBar(
                             content: Text('$result foto(s) sincronizada(s)'),
                             backgroundColor: result > 0
-                                ? Colors.green
+                                ? const Color(0xFFE8962E)
                                 : Colors.orange,
                           ),
                         );
@@ -836,7 +836,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Dados recarregados'),
-                          backgroundColor: Colors.green,
+                          backgroundColor: const Color(0xFFE8962E),
                         ),
                       );
                     }
@@ -847,7 +847,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: TextStyle(fontSize: 12),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: const Color(0xFFE8962E),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
@@ -1079,7 +1079,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Questionário editado com sucesso!'),
-              backgroundColor: Colors.green,
+              backgroundColor: const Color(0xFFE8962E),
               duration: Duration(seconds: 2),
             ),
           );
@@ -1133,7 +1133,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ? '$syncedCount formulário${syncedCount != 1 ? 's' : ''} sincronizado${syncedCount != 1 ? 's' : ''} com sucesso!'
                   : 'Nenhum formulário foi sincronizado. Verifique a conexão.',
             ),
-            backgroundColor: syncedCount > 0 ? Colors.green : Colors.orange,
+            backgroundColor: syncedCount > 0 ? const Color(0xFFE8962E) : Colors.orange,
             duration: const Duration(seconds: 3),
           ),
         );
@@ -1198,7 +1198,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ? '✅ Teste PASSOU: Salvamento funcionando!'
                   : '❌ Teste FALHOU: Problema no salvamento',
             ),
-            backgroundColor: testResult ? Colors.green : Colors.red,
+            backgroundColor: testResult ? const Color(0xFFE8962E) : Colors.red,
             duration: const Duration(seconds: 3),
           ),
         );
@@ -1267,12 +1267,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF8fae5d), Color(0xFF7a9a50)],
+          colors: [Color(0xFFE8962E), Color(0xFFBF6D16)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF8fae5d).withOpacity(0.3),
+            color: const Color(0xFFE8962E).withOpacity(0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -1359,7 +1359,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: Icons.analytics,
             title: 'Estatísticas Gerais',
             subtitle: 'Relatórios e métricas',
-            color: const Color(0xFF8fae5d),
+            color: const Color(0xFFE8962E),
             onTap: () => _navigateToStats(context),
           ),
           _buildManagementOption(
@@ -1512,7 +1512,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         'Total Formulários',
                         '${stats?.totalForms ?? 0}',
                         Icons.assignment,
-                        const Color(0xFF8fae5d),
+                        const Color(0xFFE8962E),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1530,7 +1530,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         'Sucesso',
                         '${stats?.successRate ?? 0}%',
                         Icons.check_circle,
-                        Colors.green,
+                        const Color(0xFFE8962E),
                       ),
                     ),
                   ],

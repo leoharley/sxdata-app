@@ -42,7 +42,7 @@ class ProfileScreen extends StatelessWidget {
                   // Ícone de perfil
                   const Icon(
                     Icons.person,
-                    color: Color(0xFF8fae5d),
+                    color: Color(0xFFE8962E),
                     size: 24,
                   ),
                 ],
@@ -82,7 +82,7 @@ class ProfileScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(30),
       decoration: const BoxDecoration(
-        color: Color(0xFF8fae5d),
+        color: Color(0xFFE8962E),
       ),
       child: Column(
         children: [

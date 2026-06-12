@@ -189,7 +189,7 @@ class _QuestionAnalysisFiltersState extends State<QuestionAnalysisFilters> {
                   child: ElevatedButton(
                     onPressed: _applyFilters,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8fae5d),
+                      backgroundColor: const Color(0xFFE8962E),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
@@ -216,7 +216,7 @@ class _QuestionAnalysisFiltersState extends State<QuestionAnalysisFilters> {
             Icon(
               icon,
               size: 20,
-              color: const Color(0xFF8fae5d),
+              color: const Color(0xFFE8962E),
             ),
             const SizedBox(width: 8),
             Text(
@@ -260,10 +260,10 @@ class _QuestionAnalysisFiltersState extends State<QuestionAnalysisFilters> {
           _updateDatesByPeriod(period);
         });
       },
-      selectedColor: const Color(0xFF8fae5d).withOpacity(0.2),
-      checkmarkColor: const Color(0xFF8fae5d),
+      selectedColor: const Color(0xFFE8962E).withOpacity(0.2),
+      checkmarkColor: const Color(0xFFE8962E),
       labelStyle: TextStyle(
-        color: isSelected ? const Color(0xFF8fae5d) : Colors.grey[700],
+        color: isSelected ? const Color(0xFFE8962E) : Colors.grey[700],
         fontSize: 12,
       ),
     );
@@ -391,10 +391,10 @@ class _QuestionAnalysisFiltersState extends State<QuestionAnalysisFilters> {
           }
         });
       },
-      selectedColor: const Color(0xFF8fae5d).withOpacity(0.2),
-      checkmarkColor: const Color(0xFF8fae5d),
+      selectedColor: const Color(0xFFE8962E).withOpacity(0.2),
+      checkmarkColor: const Color(0xFFE8962E),
       labelStyle: TextStyle(
-        color: isSelected ? const Color(0xFF8fae5d) : Colors.grey[700],
+        color: isSelected ? const Color(0xFFE8962E) : Colors.grey[700],
         fontSize: 12,
       ),
     );
@@ -418,7 +418,7 @@ class _QuestionAnalysisFiltersState extends State<QuestionAnalysisFilters> {
           min: 0,
           max: 1000,
           divisions: 20,
-          activeColor: const Color(0xFF8fae5d),
+          activeColor: const Color(0xFFE8962E),
           label: _filters.minResponses.toString(),
           onChanged: (value) {
             setState(() {
@@ -455,7 +455,7 @@ class _QuestionAnalysisFiltersState extends State<QuestionAnalysisFilters> {
           min: 0,
           max: 100,
           divisions: 20,
-          activeColor: const Color(0xFF8fae5d),
+          activeColor: const Color(0xFFE8962E),
           label: '${_filters.minResponseRate.toStringAsFixed(1)}%',
           onChanged: (value) {
             setState(() {
@@ -512,7 +512,7 @@ class _QuestionAnalysisFiltersState extends State<QuestionAnalysisFilters> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFF8fae5d),
+              primary: Color(0xFFE8962E),
               onPrimary: Colors.white,
               surface: Colors.white,
               onSurface: Colors.black,

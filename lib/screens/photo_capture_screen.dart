@@ -72,7 +72,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
                   // Ícone de câmera
                   const Icon(
                     Icons.camera_alt,
-                    color: Color(0xFF8fae5d),
+                    color: Color(0xFFE8962E),
                     size: 24,
                   ),
                 ],
@@ -161,7 +161,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
         height: 150,
         decoration: BoxDecoration(
           border: Border.all(
-            color: const Color(0xFF8fae5d),
+            color: const Color(0xFFE8962E),
             width: 2,
             style: BorderStyle.solid,
           ),
@@ -175,13 +175,13 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
               Icon(
                 Icons.camera_alt,
                 size: 60,
-                color: Color(0xFF8fae5d),
+                color: Color(0xFFE8962E),
               ),
               SizedBox(height: 15),
               Text(
                 'Toque para capturar foto',
                 style: TextStyle(
-                  color: Color(0xFF8fae5d),
+                  color: Color(0xFFE8962E),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -208,7 +208,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
         height: 150,
         decoration: BoxDecoration(
           border: Border.all(
-            color: const Color(0xFF8fae5d),
+            color: const Color(0xFFE8962E),
             width: 2,
             style: BorderStyle.solid,
           ),
@@ -222,13 +222,13 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
               Icon(
                 Icons.camera_alt,
                 size: 60,
-                color: Color(0xFF8fae5d),
+                color: Color(0xFFE8962E),
               ),
               SizedBox(height: 15),
               Text(
                 'Toque para capturar segunda foto',
                 style: TextStyle(
-                  color: Color(0xFF8fae5d),
+                  color: Color(0xFFE8962E),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -267,7 +267,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.check_circle, color: Color(0xFF8fae5d), size: 20),
+              Icon(Icons.check_circle, color: Color(0xFFE8962E), size: 20),
               SizedBox(width: 8),
               Text(
                 '📋 Foto capturada:',
@@ -325,7 +325,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
             children: [
               const Row(
                 children: [
-                  Icon(Icons.check_circle, color: Color(0xFF8fae5d), size: 20),
+                  Icon(Icons.check_circle, color: Color(0xFFE8962E), size: 20),
                   SizedBox(width: 8),
                   Text(
                     '📋 Segunda foto capturada:',
@@ -337,7 +337,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
                 ],
               ),
               IconButton(
-                icon: const Icon(Icons.refresh, color: Color(0xFF8fae5d)),
+                icon: const Icon(Icons.refresh, color: Color(0xFFE8962E)),
                 onPressed: _retakePhoto2,
                 tooltip: 'Refazer foto 2',
               ),
@@ -512,7 +512,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
               //onPressed: _isNavigating ? null : (canFinish ? _completeForm : null),
               onPressed: _completeForm,
               style: ElevatedButton.styleFrom(
-                backgroundColor: canFinish ? const Color(0xFF8fae5d) : Colors.grey,
+                backgroundColor: canFinish ? const Color(0xFFE8962E) : Colors.grey,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(

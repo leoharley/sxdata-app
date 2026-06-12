@@ -11,6 +11,7 @@ import '../services/conditional_logic_engine.dart';
 import '../services/local_storage_service.dart';
 import '../services/api_service.dart';
 import '../services/photo_storage_service.dart';
+import 'package:path_provider/path_provider.dart';
 
 class FormProvider with ChangeNotifier {
   FormResponse? _currentForm;
@@ -614,6 +615,66 @@ class FormProvider with ChangeNotifier {
     }
   }
 
+  /// Define o caminho do áudio gravado
+  void setAudio(String audioPath) {
+    print('🎤 Definindo áudio: $audioPath');
+
+    if (_currentForm != null) {
+      try {
+        _currentForm = _currentForm!.copyWith(audioPath: audioPath);
+        print('✅ Áudio definido');
+        notifyListeners();
+      } catch (e) {
+        print('❌ Erro ao definir áudio: $e');
+      }
+    } else {
+      print('⚠️ Tentativa de definir áudio sem formulário ativo');
+    }
+  }
+
+  /// Salva o áudio offline no diretório do app
+  Future<String?> saveAudioOffline(String audioPath) async {
+    print('🎤 === SALVANDO ÁUDIO OFFLINE ===');
+
+    if (_currentForm == null) {
+      print('❌ Nenhum formulário ativo para salvar áudio');
+      return null;
+    }
+
+    try {
+      final File audioFile = File(audioPath);
+
+      if (!await audioFile.exists()) {
+        print('❌ Arquivo de áudio não encontrado: $audioPath');
+        return null;
+      }
+
+      final int formId =
+          _currentForm!.id ?? DateTime.now().millisecondsSinceEpoch;
+
+      // Salvar no diretório de documentos do app
+      final appDocDir = await getApplicationDocumentsDirectory();
+      final audioDir = Directory('${appDocDir.path}/offline_audios');
+      if (!await audioDir.exists()) {
+        await audioDir.create(recursive: true);
+      }
+      final String extension = audioPath.split('.').last;
+      final String filename = 'audio_${formId}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+      final String destPath = '${audioDir.path}/$filename';
+
+      await audioFile.copy(destPath);
+      print('✅ Áudio salvo offline como: $filename');
+
+      _currentForm = _currentForm!.copyWith(audioPath: filename);
+      notifyListeners();
+      return filename;
+    } catch (e, stackTrace) {
+      print('❌ Erro ao salvar áudio offline: $e');
+      print('📋 Stack trace: $stackTrace');
+      return null;
+    }
+  }
+
   void clearPreservedData() {
     print('🧹 Limpando dados preservados');
     _lastCompletedForm = null;
@@ -764,6 +825,7 @@ class FormProvider with ChangeNotifier {
       String? finalPhotoFilename =
           uploadedPhotoFilename ?? _currentForm!.photoPath;
       String? finalPhotoFilename2 = _currentForm!.photoPath2;
+      String? finalAudioFilename = _currentForm!.audioPath;
 
       // PROCESSAR PRIMEIRA FOTO
       if (_currentForm!.photoPath != null &&
@@ -833,6 +895,38 @@ class FormProvider with ChangeNotifier {
         print('📸 Nenhuma foto 2 no formulário');
       }
 
+      // PROCESSAR ÁUDIO
+      if (_currentForm!.audioPath != null &&
+          _currentForm!.audioPath!.isNotEmpty) {
+        final String audioPath = _currentForm!.audioPath!;
+
+        print('🎤 === PROCESSANDO ÁUDIO ===');
+        print('🎤 Caminho do áudio: $audioPath');
+
+        if (audioPath.contains('/') && !audioPath.startsWith('http')) {
+          print('🎤 Áudio local detectado, salvando offline...');
+
+          try {
+            final String? offlineFilename = await saveAudioOffline(audioPath);
+            if (offlineFilename != null) {
+              finalAudioFilename = offlineFilename;
+              print('✅ Áudio salvo offline como: $offlineFilename');
+            } else {
+              print('⚠️ Falha ao salvar áudio offline, usando caminho original');
+              finalAudioFilename = audioPath;
+            }
+          } catch (e) {
+            print('❌ Erro ao salvar áudio offline: $e');
+            finalAudioFilename = audioPath;
+          }
+        } else {
+          print('🎤 Áudio já processado (filename): $audioPath');
+          finalAudioFilename = audioPath;
+        }
+      } else {
+        print('🎤 Nenhum áudio no formulário');
+      }
+
       // Preparar formulário para salvamento
       // Se estiver em modo de edição, GARANTIR que usa o ID existente
       print('📝 ========================================');
@@ -875,6 +969,7 @@ class FormProvider with ChangeNotifier {
           responses: _responses.values.toList(),
           photoPath: finalPhotoFilename,
           photoPath2: finalPhotoFilename2,
+          audioPath: finalAudioFilename,
         );
 
         print('✏️ formToSave DEPOIS do copyWith:');
@@ -896,6 +991,7 @@ class FormProvider with ChangeNotifier {
           responses: _responses.values.toList(),
           photoPath: finalPhotoFilename,
           photoPath2: finalPhotoFilename2,
+          audioPath: finalAudioFilename,
         );
       }
 
@@ -1171,6 +1267,57 @@ class FormProvider with ChangeNotifier {
     }
   }
 
+  /// Sincroniza áudios pendentes (arquivos em offline_audios/).
+  /// Cada arquivo enviado com sucesso é removido localmente, então o que
+  /// resta no diretório é, por definição, pendente — isso dá retry natural
+  /// sem precisar de metadados como os das fotos.
+  Future<int> syncPendingAudios() async {
+    print('🎤 === SINCRONIZANDO ÁUDIOS PENDENTES ===');
+
+    try {
+      final appDocDir = await getApplicationDocumentsDirectory();
+      final audioDir = Directory('${appDocDir.path}/offline_audios');
+
+      if (!await audioDir.exists()) {
+        print('🎤 Diretório de áudios offline não existe, nada a sincronizar');
+        return 0;
+      }
+
+      final audioFiles = audioDir.listSync().whereType<File>().toList();
+      print('🎤 ${audioFiles.length} áudios pendentes para sincronizar');
+
+      int syncedCount = 0;
+
+      for (final audioFile in audioFiles) {
+        final filename = audioFile.path.split(Platform.pathSeparator).last;
+        try {
+          print('📤 Enviando áudio: $filename');
+          final result = await ApiService.uploadAudio(audioFile);
+
+          if (result['success'] == true ||
+              result.containsKey('filename') ||
+              result.containsKey('file_name') ||
+              result.containsKey('path')) {
+            await audioFile.delete();
+            syncedCount++;
+            print('✅ Áudio $filename sincronizado e removido localmente');
+          } else {
+            print('❌ Resposta inválida do servidor para áudio $filename: $result');
+          }
+        } catch (e) {
+          print('❌ Erro ao sincronizar áudio $filename: $e');
+        }
+      }
+
+      print('✅ Sincronização de áudios concluída: $syncedCount de ${audioFiles.length}');
+      return syncedCount;
+    } catch (e, stackTrace) {
+      print('❌ Erro durante sincronização de áudios: $e');
+      print('📋 Stack trace: $stackTrace');
+      return 0;
+    }
+  }
+
   /// Diagnóstico completo de fotos
   Future<void> debugPhotosFullDiagnostic() async {
     print('🔍 === DIAGNÓSTICO COMPLETO DE FOTOS ===');
@@ -1314,11 +1461,23 @@ class FormProvider with ChangeNotifier {
         }
       }
 
+      // 3. Sincronizar áudios pendentes
+      print('🎤 === FASE 3: SINCRONIZANDO ÁUDIOS ===');
+      try {
+        final audiosSyncedCount = await syncPendingAudios();
+        print('🎤 Resultado da sincronização de áudios: $audiosSyncedCount');
+        totalSynced += audiosSyncedCount;
+      } catch (e, stackTrace) {
+        print('❌ ERRO CRÍTICO na sincronização de áudios: $e');
+        print('📋 Stack trace: $stackTrace');
+      }
+
       print('📊 === SINCRONIZAÇÃO COMPLETA CONCLUÍDA ===');
       print(
         '   - Formulários sincronizados: $formsSyncedCount de ${pendingForms.length}',
       );
       print('   - Fotos processadas: executado (verificar logs acima)');
+      print('   - Áudios processados: executado (verificar logs acima)');
       print('   - Total de itens sincronizados: $totalSynced');
 
       return totalSynced;
