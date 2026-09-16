@@ -75,7 +75,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF23345F),
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: Column(
@@ -102,7 +102,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 'Sistema de Coleta de Dados',
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.white70,
+                  color: Color(0xFF23345F),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -110,7 +110,7 @@ class _SplashScreenState extends State<SplashScreen> {
               
               // Loading indicator
               const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8fae5d)),
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
                 strokeWidth: 3,
               ),
               const SizedBox(height: 20),
@@ -132,7 +132,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     statusText,
                     style: const TextStyle(
                       fontSize: 14,
-                      color: Colors.white60,
+                      color: Colors.grey,
                     ),
                     textAlign: TextAlign.center,
                   );
@@ -146,7 +146,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 'Versão: 2.0',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.white54,
+                  color: Colors.grey,
                 ),
               ),
             ],

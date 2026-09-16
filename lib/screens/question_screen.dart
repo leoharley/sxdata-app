@@ -1,8 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:record/record.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/questionnaire.dart';
 import '../models/question.dart';
 import '../providers/form_provider.dart';
+import '../providers/stratification_provider.dart';
 import '../widgets/question_widgets.dart';
 import 'photo_capture_screen.dart';
 import 'form_completed_screen.dart';
@@ -27,6 +33,13 @@ class _QuestionScreenState extends State<QuestionScreen> {
   final Map<int, dynamic> _currentAnswers = {};
   int _currentVisibleIndex = 0;
   bool _isInitialized = false;
+
+  // Audio recording
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  bool _isRecording = false;
+  String? _audioPath;
+  Timer? _recordingTimer;
+  int _recordingSeconds = 0;
 
   @override
   void initState() {
@@ -86,6 +99,9 @@ class _QuestionScreenState extends State<QuestionScreen> {
           _isInitialized = true;
         });
 
+        // Iniciar gravação de áudio automaticamente
+        _startRecording();
+
         print('✅ Modo de edição inicializado com ${formProvider.responses.length} respostas');
         return;
       }
@@ -118,6 +134,9 @@ class _QuestionScreenState extends State<QuestionScreen> {
         setState(() {
           _isInitialized = true;
         });
+
+        // Iniciar gravação de áudio automaticamente
+        _startRecording();
 
         print('✅ Inicialização completa');
       } else {
@@ -202,6 +221,16 @@ class _QuestionScreenState extends State<QuestionScreen> {
                 Expanded(
                   child: PageView.builder(
                     controller: _pageController,
+                    // Bloqueia o deslize para a PRÓXIMA questão enquanto a
+                    // questão obrigatória atual não for respondida (o botão
+                    // "Próxima" já valida; o gesto não validava). Voltar
+                    // deslizando continua permitido.
+                    physics: _BlockForwardSwipePhysics(
+                      canAdvance: () => _canAdvanceFromCurrentQuestion(
+                        visibleQuestions,
+                        formProvider,
+                      ),
+                    ),
                     itemCount: visibleQuestions.length,
                     onPageChanged: (index) {
                       setState(() {
@@ -347,29 +376,106 @@ class _QuestionScreenState extends State<QuestionScreen> {
     width: double.infinity,
     padding: const EdgeInsets.all(20),
     decoration: const BoxDecoration(color: Color(0xFFF5F5F5)),
-    child: Row(
+    child: Column(
       children: [
-        // Espaço vazio à esquerda
-        const Expanded(child: SizedBox()),
-        
-        // Imagem centralizada
-        Image.asset(
-          'assets/images/logo_alveslima.png',
-          width: 120,
-          fit: BoxFit.contain,
+        Row(
+          children: [
+            // Espaço vazio à esquerda
+            const Expanded(child: SizedBox()),
+
+            // Imagem centralizada
+            Image.asset(
+              'assets/images/logo_alveslima.png',
+              width: 120,
+              fit: BoxFit.contain,
+            ),
+
+            // Espaço à direita com ícone
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: const Icon(Icons.quiz, color: Color(0xFFE8962E), size: 24),
+              ),
+            ),
+          ],
         ),
-        
-        // Espaço à direita com ícone
-        Expanded(
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: const Icon(Icons.quiz, color: Color(0xFF8fae5d), size: 24),
+        // Indicador de gravação de áudio
+        if (_isRecording)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: GestureDetector(
+              onTap: () async {
+                final path = await _stopRecording();
+                if (path != null && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Gravação de áudio parada manualmente'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.red.shade300),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Gravando ${_formatRecordingTime(_recordingSeconds)}',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.stop, color: Colors.red.shade700, size: 16),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
       ],
     ),
   );
 }
+
+  /// Retorna true se a questão visível atual permite avançar por gesto:
+  /// não obrigatória ou já respondida. Mesma regra do botão "Próxima".
+  bool _canAdvanceFromCurrentQuestion(
+    List<Question> visibleQuestions,
+    FormProvider formProvider,
+  ) {
+    if (_currentVisibleIndex < 0 ||
+        _currentVisibleIndex >= visibleQuestions.length) {
+      return true;
+    }
+
+    final question = visibleQuestions[_currentVisibleIndex];
+    final originalIndex = _getOriginalIndex(question, formProvider);
+    if (originalIndex < 0) return true;
+
+    final questionState = formProvider.getQuestionState(originalIndex);
+    final isRequired = questionState?.required ?? question.isRequired;
+    if (!isRequired) return true;
+
+    final response = formProvider.getResponse(question.id);
+    return response != null && response.toString().trim().isNotEmpty;
+  }
 
   int _getOriginalIndex(Question question, FormProvider formProvider) {
     for (int i = 0; i < formProvider.questions.length; i++) {
@@ -410,7 +516,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF8fae5d),
+                      color: const Color(0xFFE8962E),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -468,7 +574,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
                           'Estado: visible=${questionState?.visible}, required=${questionState?.required}',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.green.shade700,
+                            color: const Color(0xFFBF6D16),
                           ),
                         ),
                         if (question.hasConditionalLogic)
@@ -492,6 +598,10 @@ class _QuestionScreenState extends State<QuestionScreen> {
                       print('📝 === RESPOSTA ALTERADA ===');
                       print('📝 Questão ${question.id}: "$value"');
 
+                      // Capturar opção recém-selecionada antes de atualizar o estado
+                      final justSelected =
+                          _getJustSelectedOption(question.id, value);
+
                       setState(() {
                         _currentAnswers[question.id] = value;
                       });
@@ -504,6 +614,11 @@ class _QuestionScreenState extends State<QuestionScreen> {
                       );
 
                       print('📝 Resposta salva, aguardando reavaliação...');
+
+                      // Verificar cota de estratificação (alerta não bloqueante)
+                      if (justSelected != null) {
+                        _checkStratificationQuota(question.id, justSelected);
+                      }
                     },
                   ),
                 ],
@@ -570,7 +685,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
                 formProvider,
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8fae5d),
+                backgroundColor: const Color(0xFFE8962E),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
@@ -638,9 +753,24 @@ class _QuestionScreenState extends State<QuestionScreen> {
         return;
       }
 
+      // Parar gravação de áudio e salvar caminho
+      if (_isRecording) {
+        final audioPath = await _stopRecording();
+        if (audioPath != null) {
+          formProvider.setAudio(audioPath);
+          print('🎤 Áudio salvo no formulário: $audioPath');
+        }
+      } else if (_audioPath != null) {
+        // Gravação parada manualmente pelo usuário: anexar o áudio já gravado
+        // mesmo assim, senão o arquivo se perde.
+        formProvider.setAudio(_audioPath!);
+        print('🎤 Áudio (parado manualmente) salvo no formulário: $_audioPath');
+      }
+
       // Finalizar formulário
       if (widget.questionnaire.requiresPhoto) {
         // Para questionários com foto, navegar para captura de foto
+        if (!mounted) return;
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -649,6 +779,9 @@ class _QuestionScreenState extends State<QuestionScreen> {
           ),
         );
       } else {
+        // Sem foto: capturar a localização (se exigida) antes de submeter.
+        // A captura via PhotoCaptureScreen não acontece aqui, então fazemos aqui.
+        await _captureLocationIfRequired(formProvider);
         // Para questionários sem foto, submeter e navegar
         await _submitAndNavigate(formProvider);
       }
@@ -657,6 +790,46 @@ class _QuestionScreenState extends State<QuestionScreen> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
+    }
+  }
+
+  /// Captura a localização GPS quando o questionário exige (requiresLocation),
+  /// mas o fluxo não passa pela PhotoCaptureScreen (que já captura por conta própria).
+  /// Sem isso, questionários com "Capturar Localização" ligado e "Requer Foto"
+  /// desligado nunca registravam as coordenadas.
+  Future<void> _captureLocationIfRequired(FormProvider formProvider) async {
+    if (!widget.questionnaire.requiresLocation) return;
+
+    // Já capturada (ex.: edição com localização preservada)? Não recapturar.
+    if (formProvider.currentForm?.latitude != null) {
+      print('📍 Localização já definida, mantendo a existente');
+      return;
+    }
+
+    try {
+      final permission = await Permission.location.request();
+      print('📍 Permissão de localização: $permission');
+
+      if (!permission.isGranted) {
+        print('📍 Permissão de localização não concedida — seguindo sem coordenadas');
+        return;
+      }
+
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        print('📍 Serviço de localização desativado — seguindo sem coordenadas');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      ).timeout(const Duration(seconds: 15));
+
+      print('📍 Localização obtida: ${position.latitude}, ${position.longitude}');
+      formProvider.setLocation(position.latitude, position.longitude, '');
+    } catch (e) {
+      // Falha na captura não deve bloquear a submissão do formulário.
+      print('❌ Erro ao capturar localização: $e');
     }
   }
 
@@ -698,7 +871,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
           Text(formProvider.isEditMode ? 'Atualizando respostas...' : 'Salvando respostas...'),
         ],
       ),
-      backgroundColor: const Color(0xFF8fae5d),
+      backgroundColor: const Color(0xFFE8962E),
       duration: const Duration(seconds: 10),
     ),
   );
@@ -834,9 +1007,180 @@ class _QuestionScreenState extends State<QuestionScreen> {
     }
   }
 
+  /// Retorna a string da opção recém-selecionada comparando com o estado
+  /// anterior em [_currentAnswers]. Para radio retorna o valor diretamente;
+  /// para checkbox retorna o item adicionado na última interação.
+  String? _getJustSelectedOption(int questionId, dynamic newValue) {
+    if (newValue == null) return null;
+
+    if (newValue is String) {
+      return newValue.isNotEmpty ? newValue : null;
+    }
+
+    if (newValue is List) {
+      final prev = _currentAnswers[questionId];
+      final prevList = (prev is List) ? prev.cast<String>() : <String>[];
+      final newList = newValue.cast<String>();
+      final added = newList.where((v) => !prevList.contains(v)).toList();
+      return added.isNotEmpty ? added.first : null;
+    }
+
+    return null;
+  }
+
+  /// Exibe um SnackBar de alerta (não bloqueante) quando a cota do estrato
+  /// selecionado já foi atingida, conforme dados de estratificação carregados.
+  void _checkStratificationQuota(int questionId, String optionValue) {
+    final stratProvider =
+        Provider.of<StratificationProvider>(context, listen: false);
+    if (!stratProvider.hasStratification) return;
+
+    final alert =
+        stratProvider.stratification!.getQuotaAlert(questionId, optionValue);
+    if (alert == null) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Atenção: A cota para ${alert['optionLabel']} na categoria '
+          '${alert['categoryName']} já foi atingida '
+          '(${alert['currentCount']}/${alert['targetQuota']}).',
+        ),
+        backgroundColor: Colors.orange.shade700,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Audio Recording
+  // ---------------------------------------------------------------------------
+
+  Future<void> _startRecording() async {
+    try {
+      final status = await Permission.microphone.request();
+      if (!status.isGranted) {
+        print('🎤 Permissão de microfone negada');
+        return;
+      }
+
+      if (await _audioRecorder.hasPermission()) {
+        final appDocDir = await getApplicationDocumentsDirectory();
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final path = '${appDocDir.path}/recording_$timestamp.m4a';
+
+        await _audioRecorder.start(
+          const RecordConfig(
+            encoder: AudioEncoder.aacLc,
+            bitRate: 64000,
+            sampleRate: 22050,
+          ),
+          path: path,
+        );
+
+        _audioPath = path;
+        _recordingSeconds = 0;
+        _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+          setState(() {
+            _recordingSeconds++;
+          });
+        });
+
+        setState(() {
+          _isRecording = true;
+        });
+
+        print('🎤 Gravação iniciada: $path');
+      }
+    } catch (e) {
+      print('❌ Erro ao iniciar gravação: $e');
+    }
+  }
+
+  Future<String?> _stopRecording() async {
+    try {
+      if (!_isRecording) return null;
+
+      _recordingTimer?.cancel();
+      _recordingTimer = null;
+
+      final path = await _audioRecorder.stop();
+
+      setState(() {
+        _isRecording = false;
+      });
+
+      print('🎤 Gravação finalizada: $path (${_recordingSeconds}s)');
+      return path;
+    } catch (e) {
+      print('❌ Erro ao parar gravação: $e');
+      setState(() {
+        _isRecording = false;
+      });
+      return null;
+    }
+  }
+
+  String _formatRecordingTime(int seconds) {
+    final m = (seconds ~/ 60).toString().padLeft(2, '0');
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
   @override
   void dispose() {
+    _recordingTimer?.cancel();
+    if (_isRecording) {
+      _audioRecorder.stop();
+    }
+    _audioRecorder.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+}
+
+/// Physics que impede o deslize para a página SEGUINTE quando [canAdvance]
+/// retorna false (questão obrigatória sem resposta), mas mantém livre o
+/// deslize para a página anterior. Bloqueia tanto o arrasto quanto o "fling".
+class _BlockForwardSwipePhysics extends PageScrollPhysics {
+  final bool Function() canAdvance;
+
+  const _BlockForwardSwipePhysics({required this.canAdvance, super.parent});
+
+  @override
+  _BlockForwardSwipePhysics applyTo(ScrollPhysics? ancestor) {
+    return _BlockForwardSwipePhysics(
+      canAdvance: canAdvance,
+      parent: buildParent(ancestor),
+    );
+  }
+
+  @override
+  double applyPhysicsToUserOffset(ScrollMetrics position, double offset) {
+    // offset negativo = dedo arrastando rumo à próxima página
+    if (offset < 0 && !canAdvance()) {
+      return 0;
+    }
+    return super.applyPhysicsToUserOffset(position, offset);
+  }
+
+  @override
+  double applyBoundaryConditions(ScrollMetrics position, double value) {
+    // O PageView nos coloca como parent da PageScrollPhysics dele, que NÃO
+    // delega createBallisticSimulation — então um fling ainda avançava de
+    // página. applyBoundaryConditions É delegado e roda a cada frame (arrasto
+    // e animação): aqui fixamos o teto na página atual. A "âncora" via ceil
+    // permite que um deslize para trás abandonado se reacomode na página
+    // atual, sem nunca cruzar para a seguinte.
+    if (!canAdvance() && value > position.pixels) {
+      final double pageWidth = position.viewportDimension;
+      final double maxAllowed =
+          ((position.pixels / pageWidth) - 0.001).ceilToDouble() * pageWidth;
+      if (value > maxAllowed) {
+        return value - maxAllowed;
+      }
+    }
+    return super.applyBoundaryConditions(position, value);
   }
 }

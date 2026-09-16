@@ -11,6 +11,7 @@ class FormResponse {
   final String? locationName;
   final String? photoPath;
   final String? photoPath2;
+  final String? audioPath;
   final bool consentGiven;
   final String syncStatus;
   final DateTime startedAt;
@@ -29,6 +30,7 @@ class FormResponse {
     this.locationName,
     this.photoPath,
     this.photoPath2,
+    this.audioPath,
     required this.consentGiven,
     this.syncStatus = 'pending',
     required this.startedAt,
@@ -49,6 +51,7 @@ class FormResponse {
     String? locationName,
     String? photoPath,
     String? photoPath2,
+    String? audioPath,
     bool? consentGiven,
     String? syncStatus,
     DateTime? startedAt,
@@ -67,6 +70,7 @@ class FormResponse {
       locationName: locationName ?? this.locationName,
       photoPath: photoPath ?? this.photoPath,
       photoPath2: photoPath2 ?? this.photoPath2,
+      audioPath: audioPath ?? this.audioPath,
       consentGiven: consentGiven ?? this.consentGiven,
       syncStatus: syncStatus ?? this.syncStatus,
       startedAt: startedAt ?? this.startedAt,
@@ -89,6 +93,7 @@ class FormResponse {
         locationName: json['location_name'] as String?,
         photoPath: json['photo_path'] as String?,
         photoPath2: json['photo_path_2'] as String?,
+        audioPath: json['audio_path'] as String?,
         consentGiven: json['consent_given'] as bool? ?? false,
         syncStatus: json['sync_status'] as String? ?? 'pending',
         startedAt: DateTime.parse(json['started_at'] as String),
@@ -123,6 +128,7 @@ class FormResponse {
         'location_name': locationName,
         'photo_path': photoPath,
         'photo_path_2': photoPath2,
+        'audio_path': audioPath,
         'consent_given': consentGiven,
         'sync_status': syncStatus,
         'started_at': startedAt.toIso8601String(),

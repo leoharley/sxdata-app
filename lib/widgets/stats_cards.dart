@@ -17,7 +17,7 @@ class StatsCards extends StatelessWidget {
           child: _buildStatCard(
             _getQuestionnairesTodayCount().toString(),
             'Formulários Disponibilizados Hoje',
-            const Color(0xFF8fae5d),
+            const Color(0xFFE8962E),
           ),
         ),
         /*const SizedBox(width: 15),

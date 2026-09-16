@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/form_response.dart';
+import '../models/stratification.dart';
 
 class ApiService {
   static const String baseUrl = 'https://institutoalveslima.com.br/painel/api';
@@ -137,6 +138,38 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Failed to upload photo: $e');
+    }
+  }
+
+  /// Upload de áudio gravado durante aplicação do questionário
+  static Future<Map<String, dynamic>> uploadAudio(File audio, {int? formResponseId}) async {
+    try {
+      print('🎤 Uploading audio: ${audio.path}');
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/audios/upload'),
+      );
+
+      final headers = await _getHeaders();
+      request.headers.addAll(headers);
+      request.files.add(await http.MultipartFile.fromPath('audio', audio.path));
+      if (formResponseId != null) {
+        request.fields['form_response_id'] = formResponseId.toString();
+      }
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      final responseData = jsonDecode(responseBody);
+
+      if (response.statusCode == 200) {
+        print('✅ Audio uploaded successfully');
+        return responseData;
+      } else {
+        throw Exception(responseData['message'] ?? 'Failed to upload audio');
+      }
+    } catch (e) {
+      print('❌ Failed to upload audio: $e');
+      throw Exception('Failed to upload audio: $e');
     }
   }
 
@@ -1176,6 +1209,49 @@ class ApiService {
     } catch (e) {
       print('❌ Erro de conectividade: $e');
       return false;
+    }
+  }
+
+  /// Retorna os dados de estratificação de um questionário, ou null se não
+  /// houver estratificação configurada ou em caso de erro/offline.
+  static Future<StratificationData?> getStratification(
+      int questionnaireId) async {
+    try {
+      final url = '$baseUrl/stratification/$questionnaireId';
+      final headers = await _getHeaders();
+      print('📊 GET $url');
+      print('📊 Headers: $headers');
+
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      print('📊 Status: ${response.statusCode}');
+      print('📊 Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData =
+            jsonDecode(response.body) as Map<String, dynamic>;
+        if (responseData['success'] == true) {
+          final data = responseData['data'];
+          if (data == null) {
+            print('📊 Resposta success=true mas data=null');
+            return null;
+          }
+          return StratificationData.fromJson(data as Map<String, dynamic>);
+        }
+        print('📊 Resposta success=${responseData['success']} - message: ${responseData['message']}');
+        throw Exception('API retornou success=false: ${responseData['message']}');
+      } else if (response.statusCode == 401) {
+        print('📊 Token não autorizado (401)');
+        throw Exception('Token não autorizado (401)');
+      } else {
+        print('📊 Erro HTTP ${response.statusCode}');
+        throw Exception('Erro HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Estratificação indisponível: $e');
+      rethrow;
     }
   }
 }

@@ -77,7 +77,7 @@ class _StatsScreenState extends State<StatsScreen> {
                               )
                             : const Icon(
                                 Icons.refresh,
-                                color: Color(0xFF8fae5d),
+                                color: Color(0xFFE8962E),
                                 size: 24,
                               ),
                       );
@@ -92,7 +92,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   if (statsProvider.isLoading && statsProvider.userStats == null) {
                     return const Center(
                       child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8fae5d)),
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
                       ),
                     );
                   }
@@ -131,7 +131,7 @@ class _StatsScreenState extends State<StatsScreen> {
                             icon: const Icon(Icons.refresh),
                             label: const Text('Tentar Novamente'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF8fae5d),
+                              backgroundColor: const Color(0xFFE8962E),
                               foregroundColor: Colors.white,
                             ),
                           ),
@@ -184,7 +184,7 @@ class _StatsScreenState extends State<StatsScreen> {
                         Expanded(
                           child: RefreshIndicator(
                             onRefresh: () async => _loadStats(),
-                            color: const Color(0xFF8fae5d),
+                            color: const Color(0xFFE8962E),
                             child: SingleChildScrollView(
                               physics: const AlwaysScrollableScrollPhysics(),
                               child: Column(
@@ -220,7 +220,7 @@ class _StatsScreenState extends State<StatsScreen> {
               child: _buildStatCard(
                 '${summary?.totalForms ?? 0}', 
                 'Total de\nFormulários', 
-                const Color(0xFF8fae5d)
+                const Color(0xFFE8962E)
               )
             ),
             const SizedBox(width: 15),
@@ -248,7 +248,7 @@ class _StatsScreenState extends State<StatsScreen> {
               child: _buildStatCard(
                 '${summary?.successRate ?? 0}%', 
                 'Taxa de\nSucesso', 
-                Colors.green
+                const Color(0xFFE8962E)
               )
             ),
           ],
@@ -423,7 +423,7 @@ class _StatsScreenState extends State<StatsScreen> {
   Color _getSyncStatusColor(String syncStatus) {
     switch (syncStatus.toLowerCase()) {
       case 'synced':
-        return const Color(0xFF8fae5d);
+        return const Color(0xFFE8962E);
       case 'pending':
         return Colors.orange;
       case 'error':

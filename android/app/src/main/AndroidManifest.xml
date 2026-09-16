@@ -13,6 +13,9 @@
     <!-- Câmera e Armazenamento -->
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- Microfone para gravação de áudio -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Permissões de armazenamento - ESSENCIAIS para salvar fotos offline -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />

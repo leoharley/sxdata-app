@@ -11,6 +11,7 @@ import 'providers/history_provider.dart';
 import 'screens/splash_screen.dart';
 import 'utils/theme.dart';
 import '../providers/question_analysis_provider.dart';
+import 'providers/stratification_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +48,7 @@ class AppColetaApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StatsProvider()),
         ChangeNotifierProvider(create: (_) => HistoryProvider()),
         ChangeNotifierProvider(create: (_) => QuestionAnalysisProvider()),
+        ChangeNotifierProvider(create: (_) => StratificationProvider()),
       ],
       child: MaterialApp(
         title: 'AppColeta',

@@ -91,6 +91,9 @@ dependencies:
   # ESSENCIAIS para fotos offline:
   path_provider: ^2.1.1          # Para obter diretórios do sistema
 
+  # Audio recording
+  record: ^6.2.0
+
   excel: ^4.0.6
 
   pdf: ^3.10.4
@@ -103,17 +106,19 @@ dependencies:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/icon/icone_app.png"
+  image_path: "assets/images/icone_alveslima.png"
   min_sdk_android: 21 # android min sdk min:16, default 21
+  adaptive_icon_foreground: "assets/images/icone_alveslima_foreground.png"
+  adaptive_icon_background: "#FFFFFF"
   web:
     generate: true
-    image_path: "assets/icon/icone_app.png"
+    image_path: "assets/images/icone_alveslima.png"
   windows:
     generate: true
-    image_path: "assets/icon/icone_app.png"
+    image_path: "assets/images/icone_alveslima.png"
   macos:
     generate: true
-    image_path: "assets/icon/icone_app.png"
+    image_path: "assets/images/icone_alveslima.png"
 
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1
