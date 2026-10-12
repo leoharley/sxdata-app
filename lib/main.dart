@@ -8,6 +8,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'providers/stats_provider.dart';
 import 'providers/form_provider.dart';
 import 'providers/history_provider.dart';
+import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
 import 'utils/theme.dart';
 import '../providers/question_analysis_provider.dart';
@@ -15,11 +16,18 @@ import 'providers/stratification_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // Teto do cache de imagens. O padrão do Flutter (1000 imagens / 100 MB)
+  // é pensado para aparelho com folga de memória; em celular de 2 GB
+  // rodando no navegador, guardar 100 MB de bitmaps decodificados é o que
+  // derruba a aba depois da foto de evidência.
+  PaintingBinding.instance.imageCache.maximumSize = 50;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 20 << 20; // 20 MB
+
   // Inicializar configurações conforme a plataforma
   _initializePlatform();
-  
-  runApp(const AppColetaApp());
+
+  runApp(const SXDataApp());
 }
 
 void _initializePlatform() {
@@ -35,8 +43,8 @@ void _initializePlatform() {
   }
 }
 
-class AppColetaApp extends StatelessWidget {
-  const AppColetaApp({super.key});
+class SXDataApp extends StatelessWidget {
+  const SXDataApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +59,7 @@ class AppColetaApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StratificationProvider()),
       ],
       child: MaterialApp(
-        title: 'AppColeta',
+        title: 'SXData',
         theme: AppTheme.lightTheme,
         locale: const Locale('pt', 'BR'),
         localizationsDelegates: const [
@@ -64,6 +72,12 @@ class AppColetaApp extends StatelessWidget {
           Locale('en', 'US'), // Inglês (fallback)
         ],
         home: const SplashScreen(),
+        // A rota nomeada '/login' já era usada pelo dashboard (ação do aviso
+        // de sessão expirada), mas nunca esteve registrada — tocar no botão
+        // lançava exceção de rota desconhecida em vez de levar ao login.
+        routes: {
+          '/login': (_) => const LoginScreen(),
+        },
         debugShowCheckedModeBanner: false,
       ),
     );

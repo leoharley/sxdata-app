@@ -130,7 +130,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                   // Logo centralizado
                   Image.asset(
-                    'assets/images/logo_alveslima.png',
+                    'assets/images/logo_socialx.png',
                     width: 120,             
                     fit: BoxFit.contain,
                   ),
@@ -145,12 +145,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8FAE5D)),
                                 ),
                               )
                             : const Icon(
                                 Icons.refresh,
-                                color: Color(0xFFE8962E),
+                                color: Color(0xFF8FAE5D),
                                 size: 24,
                               ),
                       );
@@ -215,7 +215,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     Expanded(
                       child: RefreshIndicator(
                         onRefresh: _onRefresh,
-                        color: const Color(0xFFE8962E),
+                        color: const Color(0xFF8FAE5D),
                         child: _buildFormsList(),
                       ),
                     ),
@@ -249,9 +249,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: isActive ? const Color(0xFFE8962E) : Colors.white,
+                      color: isActive ? const Color(0xFF8FAE5D) : Colors.white,
                       border: Border.all(
-                        color: isActive ? const Color(0xFFE8962E) : Colors.grey.shade300,
+                        color: isActive ? const Color(0xFF8FAE5D) : Colors.grey.shade300,
                         width: 2,
                       ),
                       borderRadius: BorderRadius.circular(20),
@@ -316,7 +316,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8FAE5D)),
                 ),
                 SizedBox(height: 16),
                 Text(
@@ -362,7 +362,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   icon: const Icon(Icons.refresh),
                   label: const Text('Tentar novamente'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE8962E),
+                    backgroundColor: const Color(0xFF8FAE5D),
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -428,7 +428,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   padding: EdgeInsets.all(16),
                   child: Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8FAE5D)),
                     ),
                   ),
                 );
@@ -631,7 +631,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     onPressed: () => _onEditApplication(application),
                     icon: const Icon(
                       Icons.edit,
-                      color: Color(0xFFE8962E),
+                      color: Color(0xFF8FAE5D),
                     ),
                     tooltip: 'Editar questionário',
                   ),
@@ -749,13 +749,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: statusColor?.withOpacity(0.1) ?? const Color(0xFFE8962E).withOpacity(0.1),
+              color: statusColor?.withOpacity(0.1) ?? const Color(0xFF8FAE5D).withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               icon,
               size: 20,
-              color: statusColor ?? const Color(0xFFE8962E),
+              color: statusColor ?? const Color(0xFF8FAE5D),
             ),
           ),
           const SizedBox(width: 12),
@@ -791,10 +791,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: isActive ? const Color(0xFFE8962E).withOpacity(0.1) : Colors.grey[100],
+        color: isActive ? const Color(0xFF8FAE5D).withOpacity(0.1) : Colors.grey[100],
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isActive ? const Color(0xFFE8962E) : Colors.grey[300]!,
+          color: isActive ? const Color(0xFF8FAE5D) : Colors.grey[300]!,
           width: 1,
         ),
       ),
@@ -804,14 +804,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
           Icon(
             icon,
             size: 14,
-            color: isActive ? const Color(0xFFE8962E) : Colors.grey[600],
+            color: isActive ? const Color(0xFF8FAE5D) : Colors.grey[600],
           ),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
               fontSize: 12,
-              color: isActive ? const Color(0xFFE8962E) : Colors.grey[600],
+              color: isActive ? const Color(0xFF8FAE5D) : Colors.grey[600],
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -915,7 +915,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         barrierDismissible: false,
         builder: (context) => const Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8FAE5D)),
           ),
         ),
       );

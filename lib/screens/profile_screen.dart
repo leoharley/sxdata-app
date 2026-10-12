@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/stratification_provider.dart';
 import 'login_screen.dart';
 import 'stats_screen.dart';
 import 'stats_graphs_screen.dart';
@@ -35,14 +36,14 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   // Logo centralizado
                   Image.asset(
-                    'assets/images/logo_alveslima.png',
+                    'assets/images/logo_socialx.png',
                     width: 120,             
                     fit: BoxFit.contain,
                   ),
                   // Ícone de perfil
                   const Icon(
                     Icons.person,
-                    color: Color(0xFFE8962E),
+                    color: Color(0xFF8FAE5D),
                     size: 24,
                   ),
                 ],
@@ -82,7 +83,7 @@ class ProfileScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(30),
       decoration: const BoxDecoration(
-        color: Color(0xFFE8962E),
+        color: Color(0xFF8FAE5D),
       ),
       child: Column(
         children: [
@@ -285,8 +286,12 @@ class ProfileScreen extends StatelessWidget {
           TextButton(
             onPressed: () async {
               final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              // Descarta a estratificação em memória: com metas por
+              // aplicador, ela é do usuário que está saindo.
+              Provider.of<StratificationProvider>(context, listen: false)
+                  .clear();
               await authProvider.logout();
-              
+
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => const LoginScreen()),

@@ -161,7 +161,7 @@ Widget _buildTextInput() {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE8962E), width: 2),
+                    borderSide: const BorderSide(color: Color(0xFF8FAE5D), width: 2),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -261,7 +261,7 @@ Widget _buildTextInput() {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE8962E), width: 2),
+                    borderSide: const BorderSide(color: Color(0xFF8FAE5D), width: 2),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -340,7 +340,7 @@ Widget _buildTextInput() {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFE8962E), width: 2),
+            borderSide: const BorderSide(color: Color(0xFF8FAE5D), width: 2),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
@@ -577,7 +577,7 @@ Widget _buildTextInput() {
               decoration: BoxDecoration(
                 color: isSelected ? const Color(0xFFF8FAF6) : Colors.white,
                 border: Border.all(
-                  color: isSelected ? const Color(0xFFE8962E) : Colors.grey.shade300,
+                  color: isSelected ? const Color(0xFF8FAE5D) : Colors.grey.shade300,
                   width: 2,
                 ),
                 borderRadius: BorderRadius.circular(8),
@@ -603,7 +603,7 @@ Widget _buildTextInput() {
                       print('📋 New selected radio value: $_selectedRadioValue');
                       widget.onChanged(value);
                     },
-                    activeColor: const Color(0xFFE8962E),
+                    activeColor: const Color(0xFF8FAE5D),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -689,7 +689,7 @@ Widget _buildTextInput() {
               decoration: BoxDecoration(
                 color: isSelected ? const Color(0xFFF8FAF6) : Colors.white,
                 border: Border.all(
-                  color: isSelected ? const Color(0xFFE8962E) : Colors.grey.shade300,
+                  color: isSelected ? const Color(0xFF8FAE5D) : Colors.grey.shade300,
                   width: 2,
                 ),
                 borderRadius: BorderRadius.circular(8),
@@ -720,7 +720,7 @@ Widget _buildTextInput() {
                       print('📋 New selected checkbox values: $_selectedCheckboxValues');
                       widget.onChanged(List<String>.from(_selectedCheckboxValues));
                     },
-                    activeColor: const Color(0xFFE8962E),
+                    activeColor: const Color(0xFF8FAE5D),
                   ),
                   const SizedBox(width: 10),
                   Expanded(

@@ -18,21 +18,232 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <!-- Sem esta tag o navegador móvel renderiza na largura de desktop e o
+       layout sai encolhido, sem se adaptar à tela. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#23345F">
+  <meta name="description" content="Aplicativo de coleta de dados e questionários com suporte offline.">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="AppColeta">
+  <!-- Nome sob o ícone no iPhone. Mantenha igual ao short_name do manifest. -->
+  <meta name="apple-mobile-web-app-title" content="SXData">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>AppColeta</title>
+  <title>SXData</title>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
+
+  <script>
+    // -----------------------------------------------------------------------
+    // Instalação do PWA.
+    //
+    // O navegador dispara 'beforeinstallprompt' quando o app é instalável, e o
+    // banner nativo do Chrome some sozinho (ou depois de dispensado uma vez).
+    // Guardamos o evento para que a tela de login possa oferecer o botão
+    // INSTALAR na hora que o aplicador quiser, e não só quando o Chrome decide.
+    //
+    // O iPhone não tem esse evento nem instalação programática: lá o caminho é
+    // Compartilhar > Adicionar à Tela de Início, e o app mostra as instruções.
+    // -----------------------------------------------------------------------
+    (function () {
+      var estado = { deferido: null, instalado: false, aoMudar: null };
+
+      function avisar() {
+        if (typeof estado.aoMudar === 'function') {
+          try { estado.aoMudar(); } catch (e) { /* app ainda carregando */ }
+        }
+      }
+
+      window.addEventListener('beforeinstallprompt', function (e) {
+        // Impede o banner automático: quem controla o momento é a tela de login.
+        e.preventDefault();
+        estado.deferido = e;
+        avisar();
+      });
+
+      window.addEventListener('appinstalled', function () {
+        estado.deferido = null;
+        estado.instalado = true;
+        avisar();
+      });
+
+      window.pwaPodeInstalar = function () {
+        return !!estado.deferido;
+      };
+
+      // ESTA PÁGINA está rodando pelo ícone, fora do navegador?
+      //
+      // É a pergunta que libera o login, e ela NÃO pode considerar o evento
+      // 'appinstalled': ele dispara na própria aba do navegador que fez a
+      // instalação, e essa aba continua sendo navegador. Confundir as duas
+      // coisas liberava o login logo após instalar, justamente o que o portão
+      // existe para impedir.
+      //
+      // Testa os três modos "sem barra de endereço" de propósito: a media query
+      // casa com o modo EFETIVO, que vem do campo "display" do manifest.json.
+      // Checar só 'standalone' amarraria o login a esse valor — trocar o
+      // manifest para 'fullscreen' ou 'minimal-ui' trancaria todo mundo do lado
+      // de fora, e o motivo seria dificílimo de achar.
+      //
+      // navigator.standalone é o caminho do iPhone (existe desde o iOS 2 e
+      // continua sendo o mais confiável lá).
+      window.pwaEmModoApp = function () {
+        if (window.navigator.standalone === true) return true;
+
+        var modos = ['standalone', 'fullscreen', 'minimal-ui'];
+        for (var i = 0; i < modos.length; i++) {
+          try {
+            if (window.matchMedia('(display-mode: ' + modos[i] + ')').matches) {
+              return true;
+            }
+          } catch (e) { /* navegador sem suporte à media query */ }
+        }
+        return false;
+      };
+
+      // O app está instalado NO APARELHO? Pergunta diferente da de cima: serve
+      // para esconder o convite de instalação, não para liberar o acesso.
+      window.pwaEstaInstalado = function () {
+        return estado.instalado || window.pwaEmModoApp();
+      };
+
+      window.pwaEhIos = function () {
+        return /iPad|iPhone|iPod/.test(window.navigator.userAgent);
+      };
+
+      // Usado para exigir o app instalado só no celular — é lá que o aplicador
+      // trabalha e que a produção corre risco de se dividir entre navegador e
+      // ícone. No desktop o acesso pelo navegador segue liberado.
+      window.pwaEhCelular = function () {
+        var ua = window.navigator.userAgent;
+        return /Android|iPad|iPhone|iPod|Windows Phone|webOS|BlackBerry|Opera Mini|IEMobile/
+          .test(ua);
+      };
+
+      // Retorna 'aceito', 'recusado' ou 'indisponivel'.
+      window.pwaInstalar = function () {
+        var e = estado.deferido;
+        if (!e) return Promise.resolve('indisponivel');
+        e.prompt();
+        return e.userChoice.then(function (escolha) {
+          estado.deferido = null;
+          avisar();
+          return escolha && escolha.outcome === 'accepted'
+            ? 'aceito'
+            : 'recusado';
+        });
+      };
+
+      window.pwaRegistrarCallback = function (cb) {
+        estado.aoMudar = cb;
+      };
+    })();
+
+    // -----------------------------------------------------------------------
+    // Atualização do app publicado, sem depender de limpeza de cache.
+    //
+    // O service worker do Flutter continua servindo a versão instalada mesmo
+    // depois de um deploy novo: o worker novo instala e fica "esperando", e só
+    // assume quando TODAS as abas do app são fechadas. Num app instalado na
+    // tela de início isso pode não acontecer por dias.
+    //
+    // Aqui a gente detecta a versão nova e a aplica com um toque. A troca não é
+    // automática de propósito: recarregar no meio de um questionário perderia
+    // as respostas ainda não finalizadas, que só vão para o armazenamento local
+    // ao concluir. Por isso quem decide o momento é o aplicador.
+    // -----------------------------------------------------------------------
+    (function () {
+      if (!('serviceWorker' in navigator)) return;
+
+      var recarregando = false;
+
+      // Disparado quando o worker novo assume o controle da página.
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (recarregando) return;
+        recarregando = true;
+        window.location.reload();
+      });
+
+      function mostrarAviso(worker) {
+        if (document.getElementById('aviso-atualizacao')) return;
+
+        var barra = document.createElement('div');
+        barra.id = 'aviso-atualizacao';
+        barra.style.cssText =
+          'position:fixed;left:0;right:0;bottom:0;z-index:2147483647;' +
+          'background:#23345F;color:#fff;padding:12px 16px;' +
+          'display:flex;align-items:center;gap:12px;' +
+          'font-family:system-ui,-apple-system,Roboto,sans-serif;font-size:14px;' +
+          'box-shadow:0 -2px 12px rgba(0,0,0,.3);' +
+          'padding-bottom:calc(12px + env(safe-area-inset-bottom));';
+
+        var texto = document.createElement('span');
+        texto.style.cssText = 'flex:1;line-height:1.3;';
+        texto.textContent = 'Nova versão do app disponível.';
+
+        var botao = document.createElement('button');
+        botao.textContent = 'Atualizar';
+        botao.style.cssText =
+          'background:#8FAE5D;color:#fff;border:0;border-radius:6px;' +
+          'padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer;' +
+          'font-family:inherit;white-space:nowrap;';
+        botao.addEventListener('click', function () {
+          botao.disabled = true;
+          botao.textContent = 'Atualizando...';
+          // O service worker do Flutter trata esta mensagem chamando
+          // self.skipWaiting(), o que dispara o controllerchange acima.
+          worker.postMessage('skipWaiting');
+        });
+
+        var depois = document.createElement('button');
+        depois.textContent = 'Depois';
+        depois.setAttribute('aria-label', 'Adiar atualização');
+        depois.style.cssText =
+          'background:transparent;color:#fff;border:0;padding:10px 4px;' +
+          'font-size:14px;cursor:pointer;font-family:inherit;opacity:.8;';
+        depois.addEventListener('click', function () {
+          barra.remove();
+        });
+
+        barra.appendChild(texto);
+        barra.appendChild(depois);
+        barra.appendChild(botao);
+        document.body.appendChild(barra);
+      }
+
+      navigator.serviceWorker.ready.then(function (reg) {
+        // Worker novo já instalado e aguardando de uma visita anterior.
+        if (reg.waiting) mostrarAviso(reg.waiting);
+
+        reg.addEventListener('updatefound', function () {
+          var novo = reg.installing;
+          if (!novo) return;
+          novo.addEventListener('statechange', function () {
+            // 'installed' com um controller já ativo significa que havia uma
+            // versão rodando: é atualização, não a primeira instalação.
+            if (novo.state === 'installed' && navigator.serviceWorker.controller) {
+              mostrarAviso(novo);
+            }
+          });
+        });
+
+        // Procurar atualização ao abrir e sempre que o app voltar ao primeiro
+        // plano — é quando o aplicador costuma reencontrar sinal em campo.
+        reg.update();
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'visible') {
+            reg.update();
+          }
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

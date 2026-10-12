@@ -99,7 +99,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
                               )
                             : const Icon(
                                 Icons.refresh,
-                                color: Color(0xFFE8962E),
+                                color: Color(0xFF8FAE5D),
                                 size: 24,
                               ),
                       );
@@ -123,9 +123,9 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
               ),
               child: TabBar(
                 controller: _tabController,
-                labelColor: const Color(0xFFE8962E),
+                labelColor: const Color(0xFF8FAE5D),
                 unselectedLabelColor: Colors.grey,
-                indicatorColor: const Color(0xFFE8962E),
+                indicatorColor: const Color(0xFF8FAE5D),
                 tabs: const [
                   Tab(
                     icon: Icon(Icons.pie_chart),
@@ -150,7 +150,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
                   if (statsProvider.isLoading && statsProvider.userStats == null) {
                     return const Center(
                       child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8FAE5D)),
                       ),
                     );
                   }
@@ -210,7 +210,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
             icon: const Icon(Icons.refresh),
             label: const Text('Tentar Novamente'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE8962E),
+              backgroundColor: const Color(0xFF8FAE5D),
               foregroundColor: Colors.white,
             ),
           ),
@@ -222,7 +222,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
   Widget _buildSummaryTab(UserStats? userStats) {
     return RefreshIndicator(
       onRefresh: () async => _loadStats(),
-      color: const Color(0xFFE8962E),
+      color: const Color(0xFF8FAE5D),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(20),
@@ -258,7 +258,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
   Widget _buildTrendsTab(UserStats? userStats) {
     return RefreshIndicator(
       onRefresh: () async => _loadStats(),
-      color: const Color(0xFFE8962E),
+      color: const Color(0xFF8FAE5D),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(20),
@@ -296,7 +296,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
   Widget _buildComparisonTab(UserStats? userStats) {
     return RefreshIndicator(
       onRefresh: () async => _loadStats(),
-      color: const Color(0xFFE8962E),
+      color: const Color(0xFF8FAE5D),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(20),
@@ -361,7 +361,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
                 centerSpaceRadius: 60,
                 sections: [
                   PieChartSectionData(
-                    color: const Color(0xFFE8962E),
+                    color: const Color(0xFF8FAE5D),
                     value: (summary?.totalForms ?? 1).toDouble() - (summary?.pendingSync ?? 0).toDouble(),
                     title: '',
                     radius: 50,
@@ -390,7 +390,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildLegendItem('Sincronizados', const Color(0xFFE8962E), 
+              _buildLegendItem('Sincronizados', const Color(0xFF8FAE5D), 
                   (summary?.totalForms ?? 0) - (summary?.pendingSync ?? 0)),
               _buildLegendItem('Pendentes', Colors.orange, summary?.pendingSync ?? 0),
             ],
@@ -472,7 +472,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
                     barRods: [
                       BarChartRodData(
                         toY: (summary?.totalForms ?? 0).toDouble(),
-                        color: const Color(0xFFE8962E),
+                        color: const Color(0xFF8FAE5D),
                         width: 20,
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -559,7 +559,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
                   strokeWidth: 8,
                   backgroundColor: Colors.grey[300],
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    successRate >= 90 ? const Color(0xFFE8962E) :
+                    successRate >= 90 ? const Color(0xFF8FAE5D) :
                     successRate >= 70 ? Colors.orange : Colors.red,
                   ),
                 ),
@@ -573,7 +573,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: successRate >= 90 ? const Color(0xFFE8962E) :
+                      color: successRate >= 90 ? const Color(0xFF8FAE5D) :
                              successRate >= 70 ? Colors.orange : Colors.red,
                     ),
                   ),
@@ -651,12 +651,12 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
                   LineChartBarData(
                     spots: _generateDummyLineData(),
                     isCurved: true,
-                    color: const Color(0xFFE8962E),
+                    color: const Color(0xFF8FAE5D),
                     barWidth: 3,
                     dotData: const FlDotData(show: true),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: const Color(0xFFE8962E).withOpacity(0.3),
+                      color: const Color(0xFF8FAE5D).withOpacity(0.3),
                     ),
                   ),
                 ],
@@ -707,7 +707,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
                   'Total',
                   '${_getTotalForms(currentStats)}',
                   Icons.assignment,
-                  const Color(0xFFE8962E),
+                  const Color(0xFF8FAE5D),
                 ),
               ),
               Expanded(
@@ -899,7 +899,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
                       ),
                       BarChartRodData(
                         toY: _getTotalForms(monthlyStats).toDouble(),
-                        color: const Color(0xFFE8962E),
+                        color: const Color(0xFF8FAE5D),
                         width: 15,
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -916,7 +916,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
                       ),
                       BarChartRodData(
                         toY: _getPhotosCaptured(monthlyStats).toDouble(),
-                        color: const Color(0xFFE8962E),
+                        color: const Color(0xFF8FAE5D),
                         width: 15,
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -933,7 +933,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
                       ),
                       BarChartRodData(
                         toY: _getLocationsCaptured(monthlyStats).toDouble(),
-                        color: const Color(0xFFE8962E),
+                        color: const Color(0xFF8FAE5D),
                         width: 15,
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -949,7 +949,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
             children: [
               _buildLegendItem('Semanal', Colors.blue, 0),
               const SizedBox(width: 20),
-              _buildLegendItem('Mensal', const Color(0xFFE8962E), 0),
+              _buildLegendItem('Mensal', const Color(0xFF8FAE5D), 0),
             ],
           ),
         ],
@@ -1080,7 +1080,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFFE8962E),
+                  color: Color(0xFF8FAE5D),
                 ),
               ),
             ],
@@ -1097,7 +1097,7 @@ class _StatsGraphsScreenState extends State<StatsGraphsScreen>
               widthFactor: percentage,
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8962E),
+                  color: const Color(0xFF8FAE5D),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),

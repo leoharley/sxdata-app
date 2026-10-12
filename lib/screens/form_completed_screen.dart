@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'dart:io';
 import '../models/questionnaire.dart';
@@ -304,8 +305,9 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
       _locationName = 'Localização não disponível';
     }
 
-    // Configurar foto
-    if (_finalPhotoPath != null && _finalPhotoPath!.isNotEmpty) {
+    // Configurar foto (na web não há File — o preview fica sem imagem,
+    // a foto em si está guardada no IndexedDB aguardando sincronização)
+    if (!kIsWeb && _finalPhotoPath != null && _finalPhotoPath!.isNotEmpty) {
       final photoFile = File(_finalPhotoPath!);
       if (photoFile.existsSync()) {
         _capturedPhoto = photoFile;
@@ -448,7 +450,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Formulário processado com sucesso!'),
-          backgroundColor: Color(0xFFE8962E),
+          backgroundColor: Color(0xFF8FAE5D),
           duration: Duration(seconds: 2),
         ),
       );
@@ -490,14 +492,14 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
                   const SizedBox(width: 48),
                   // Logo centralizado
                   Image.asset(
-                    'assets/images/logo_alveslima.png',
+                    'assets/images/logo_socialx.png',
                     width: 120,             
                     fit: BoxFit.contain,
                   ),
                   // Ícone de conclusão
                   Icon(
                     Icons.check_circle,
-                    color: _hasSyncedSuccessfully ? const Color(0xFFE8962E) : Colors.orange,
+                    color: _hasSyncedSuccessfully ? const Color(0xFF8FAE5D) : Colors.orange,
                     size: 24,
                   ),
                 ],
@@ -518,7 +520,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
                               height: 80,
                               decoration: BoxDecoration(
                                 color: _hasSyncedSuccessfully 
-                                  ? const Color(0xFFE8962E) 
+                                  ? const Color(0xFF8FAE5D) 
                                   : Colors.orange,
                                 shape: BoxShape.circle,
                               ),
@@ -606,14 +608,14 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
               statusColor: _isSubmitting 
                 ? Colors.orange 
                 : _hasSyncedSuccessfully 
-                  ? const Color(0xFFE8962E)
+                  ? const Color(0xFF8FAE5D)
                   : Colors.orange,
             ),
             const SizedBox(height: 10),
             _buildSummaryRow(
               'Respostas:', 
               '$_responseCount questão${_responseCount != 1 ? 'ões' : ''} respondida${_responseCount != 1 ? 's' : ''}',
-              statusColor: _responseCount > 0 ? const Color(0xFFE8962E) : Colors.red,
+              statusColor: _responseCount > 0 ? const Color(0xFF8FAE5D) : Colors.red,
             ),
             const SizedBox(height: 10),
             _buildSummaryRow(
@@ -630,7 +632,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
                     ? '🔄 Enviando...'
                     : 'Pendente upload',
                 statusColor: _hasPhotoUploaded 
-                  ? const Color(0xFFE8962E) 
+                  ? const Color(0xFF8FAE5D) 
                   : _isUploadingPhoto
                     ? Colors.orange
                     : Colors.orange,
@@ -777,7 +779,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFFE8962E),
+          color: const Color(0xFF8FAE5D),
           width: 1.5,
         ),
         boxShadow: [
@@ -797,12 +799,12 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8962E).withOpacity(0.1),
+                  color: const Color(0xFF8FAE5D).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.photo_camera,
-                  color: Color(0xFFE8962E),
+                  color: Color(0xFF8FAE5D),
                   size: 20,
                 ),
               ),
@@ -834,7 +836,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8962E).withOpacity(0.1),
+                  color: const Color(0xFF8FAE5D).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Row(
@@ -843,7 +845,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
                     Icon(
                       Icons.save_alt,
                       size: 12,
-                      color: Color(0xFFE8962E),
+                      color: Color(0xFF8FAE5D),
                     ),
                     SizedBox(width: 4),
                     Text(
@@ -851,7 +853,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFFE8962E),
+                        color: Color(0xFF8FAE5D),
                       ),
                     ),
                   ],
@@ -938,7 +940,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE8962E),
+                        color: const Color(0xFF8FAE5D),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(
@@ -1043,10 +1045,10 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFE8962E).withOpacity(0.1),
+              color: const Color(0xFF8FAE5D).withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: const Color(0xFFE8962E).withOpacity(0.3),
+                color: const Color(0xFF8FAE5D).withOpacity(0.3),
               ),
             ),
             child: Column(
@@ -1056,7 +1058,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
                     Container(
                       padding: const EdgeInsets.all(4),
                       decoration: const BoxDecoration(
-                        color: Color(0xFFE8962E),
+                        color: Color(0xFF8FAE5D),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -1070,7 +1072,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
                       child: Text(
                         'Foto processada e salva localmente',
                         style: TextStyle(
-                          color: Color(0xFFE8962E),
+                          color: Color(0xFF8FAE5D),
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1130,9 +1132,9 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
                     style: TextStyle(fontSize: 12),
                   ),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFE8962E),
+                    foregroundColor: const Color(0xFF8FAE5D),
                     side: const BorderSide(
-                      color: Color(0xFFE8962E),
+                      color: Color(0xFF8FAE5D),
                       width: 1,
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
@@ -1223,7 +1225,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
           child: ElevatedButton(
             onPressed: _isSubmitting ? null : _newForm,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE8962E),
+              backgroundColor: const Color(0xFF8FAE5D),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 15),
               shape: RoundedRectangleBorder(
@@ -1252,7 +1254,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
           child: OutlinedButton(
             onPressed: () => _backToDashboard(),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFFE8962E), width: 2),
+              side: const BorderSide(color: Color(0xFF8FAE5D), width: 2),
               padding: const EdgeInsets.symmetric(vertical: 15),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1261,7 +1263,7 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
             child: const Text(
               'Voltar ao Dashboard',
               style: TextStyle(
-                color: Color(0xFFE8962E),
+                color: Color(0xFF8FAE5D),
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),

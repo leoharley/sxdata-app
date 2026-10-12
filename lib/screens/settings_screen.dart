@@ -52,14 +52,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   // Logo centralizado
                   Image.asset(
-                    'assets/images/logo_alveslima.png',
+                    'assets/images/logo_socialx.png',
                     width: 120,             
                     fit: BoxFit.contain,
                   ),
                   // Ícone de configurações
                   const Icon(
                     Icons.settings,
-                    color: Color(0xFFE8962E),
+                    color: Color(0xFF8FAE5D),
                     size: 24,
                   ),
                 ],
@@ -284,7 +284,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               width: 50,
               height: 28,
               decoration: BoxDecoration(
-                color: value ? const Color(0xFFE8962E) : Colors.grey.shade300,
+                color: value ? const Color(0xFF8FAE5D) : Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: AnimatedAlign(
@@ -339,13 +339,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8962E).withOpacity(0.1),
+                  color: const Color(0xFF8FAE5D).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   icon,
                   size: 20,
-                  color: const Color(0xFFE8962E),
+                  color: const Color(0xFF8FAE5D),
                 ),
               ),
               const SizedBox(width: 15),
@@ -620,7 +620,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   : '$syncedCount de $resetCount foto${syncedCount > 1 ? 's foram' : ' foi'} enviada${syncedCount > 1 ? 's' : ''}',
             ),
             backgroundColor: syncedCount == resetCount
-                ? const Color(0xFFE8962E)
+                ? const Color(0xFF8FAE5D)
                 : Colors.orange,
             duration: const Duration(seconds: 4),
           ),

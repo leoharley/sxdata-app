@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:geolocator/geolocator.dart';
 import '../models/questionnaire.dart';
 import '../models/question.dart';
 import '../providers/form_provider.dart';
@@ -12,7 +11,12 @@ import '../providers/stratification_provider.dart';
 import '../widgets/question_widgets.dart';
 import 'photo_capture_screen.dart';
 import 'form_completed_screen.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../providers/auth_provider.dart';
+import '../services/location_service.dart';
+import '../services/platform_caps.dart';
+import '../services/web_media_store/web_media_store.dart';
+import '../widgets/location_required_dialog.dart';
 
 class QuestionScreen extends StatefulWidget {
   final Questionnaire questionnaire;
@@ -28,7 +32,8 @@ class QuestionScreen extends StatefulWidget {
   State<QuestionScreen> createState() => _QuestionScreenState();
 }
 
-class _QuestionScreenState extends State<QuestionScreen> {
+class _QuestionScreenState extends State<QuestionScreen>
+    with WidgetsBindingObserver {
   late PageController _pageController;
   final Map<int, dynamic> _currentAnswers = {};
   int _currentVisibleIndex = 0;
@@ -41,10 +46,31 @@ class _QuestionScreenState extends State<QuestionScreen> {
   Timer? _recordingTimer;
   int _recordingSeconds = 0;
 
+  // Web: gravação por segmentos com tela ativa (docs/plano_versao_web.md).
+  // Cada segmento vai para o IndexedDB assim que fechado — interrupção
+  // (ligação, troca de aba) nunca perde o que já foi gravado.
+  int _webSegmentSeq = 0;
+  String? _webSessionId;
+  String? _webFirstSegmentFilename;
+  String _webAudioExt = 'm4a';
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0);
+    WidgetsBinding.instance.addObserver(this);
+
+    // Tela ativa durante toda a aplicação (nativo e web): não deixar a tela
+    // apagar no meio da entrevista/gravação.
+    WakelockPlus.enable();
+
+    // Aquecer o GPS desde já, em vez de partir do zero na finalização: o
+    // primeiro fix pode levar bem mais de meio minuto num aparelho parado, e
+    // esperar isso no fim da entrevista era o que fazia a captura falhar.
+    if (widget.questionnaire.requiresLocation) {
+      LocationService.limpar();
+      LocationService.iniciarAquecimento();
+    }
 
     print('🚀 === QUESTION SCREEN INICIADO ===');
     print('📝 Número de questões: ${widget.questionnaire.questions.length}');
@@ -233,6 +259,26 @@ class _QuestionScreenState extends State<QuestionScreen> {
                     ),
                     itemCount: visibleQuestions.length,
                     onPageChanged: (index) {
+                      // Fechar o teclado herdado da questão anterior quando a
+                      // nova questão não usa digitação (múltipla escolha,
+                      // checkbox, data). Tipos desconhecidos caem no campo de
+                      // texto, então só fechamos nos tipos conhecidos sem
+                      // teclado.
+                      const typesWithoutKeyboard = {
+                        'radio',
+                        'checkbox',
+                        'date',
+                        'datetime',
+                      };
+                      if (index >= 0 && index < visibleQuestions.length) {
+                        final newType = visibleQuestions[index]
+                            .questionType
+                            .toLowerCase()
+                            .trim();
+                        if (typesWithoutKeyboard.contains(newType)) {
+                          FocusManager.instance.primaryFocus?.unfocus();
+                        }
+                      }
                       setState(() {
                         _currentVisibleIndex = index;
                       });
@@ -385,7 +431,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
 
             // Imagem centralizada
             Image.asset(
-              'assets/images/logo_alveslima.png',
+              'assets/images/logo_socialx.png',
               width: 120,
               fit: BoxFit.contain,
             ),
@@ -394,28 +440,21 @@ class _QuestionScreenState extends State<QuestionScreen> {
             Expanded(
               child: Align(
                 alignment: Alignment.centerRight,
-                child: const Icon(Icons.quiz, color: Color(0xFFE8962E), size: 24),
+                child: const Icon(Icons.quiz, color: Color(0xFF8FAE5D), size: 24),
               ),
             ),
           ],
         ),
-        // Indicador de gravação de áudio
+        // Indicador de gravação de áudio.
+        //
+        // Só indicador: não responde a toque. Antes, tocar aqui encerrava a
+        // gravação, e um toque acidental no meio da entrevista cortava o áudio
+        // sem que o aplicador percebesse. A gravação agora termina apenas com
+        // a finalização do questionário.
         if (_isRecording)
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: GestureDetector(
-              onTap: () async {
-                final path = await _stopRecording();
-                if (path != null && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Gravação de áudio parada manualmente'),
-                      backgroundColor: Colors.orange,
-                    ),
-                  );
-                }
-              },
-              child: Container(
+            child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.red.shade50,
@@ -442,12 +481,9 @@ class _QuestionScreenState extends State<QuestionScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.stop, color: Colors.red.shade700, size: 16),
                   ],
                 ),
               ),
-            ),
           ),
       ],
     ),
@@ -516,7 +552,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8962E),
+                      color: const Color(0xFF8FAE5D),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -574,7 +610,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
                           'Estado: visible=${questionState?.visible}, required=${questionState?.required}',
                           style: TextStyle(
                             fontSize: 11,
-                            color: const Color(0xFFBF6D16),
+                            color: const Color(0xFF5A7536),
                           ),
                         ),
                         if (question.hasConditionalLogic)
@@ -685,7 +721,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
                 formProvider,
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE8962E),
+                backgroundColor: const Color(0xFF8FAE5D),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
@@ -755,14 +791,24 @@ class _QuestionScreenState extends State<QuestionScreen> {
 
       // Parar gravação de áudio e salvar caminho
       if (_isRecording) {
-        final audioPath = await _stopRecording();
-        if (audioPath != null) {
-          formProvider.setAudio(audioPath);
-          print('🎤 Áudio salvo no formulário: $audioPath');
+        if (PlatformCaps.hasContinuousAudioRecording) {
+          final audioPath = await _stopRecording();
+          if (audioPath != null) {
+            formProvider.setAudio(audioPath);
+            print('🎤 Áudio salvo no formulário: $audioPath');
+          }
+        } else {
+          // Web: fecha a gravação e vincula o arquivo ao formulário.
+          final firstSegment = await _finishWebRecording();
+          if (firstSegment != null) {
+            formProvider.setAudio(firstSegment);
+            print('🎤 Web: áudio vinculado ao formulário: $firstSegment');
+          }
         }
       } else if (_audioPath != null) {
-        // Gravação parada manualmente pelo usuário: anexar o áudio já gravado
-        // mesmo assim, senão o arquivo se perde.
+        // Rede de segurança: a gravação não deveria parar antes da
+        // finalização, mas se tiver parado (falha do gravador, interrupção do
+        // sistema), o arquivo já gravado é anexado em vez de se perder.
         formProvider.setAudio(_audioPath!);
         print('🎤 Áudio (parado manualmente) salvo no formulário: $_audioPath');
       }
@@ -781,7 +827,12 @@ class _QuestionScreenState extends State<QuestionScreen> {
       } else {
         // Sem foto: capturar a localização (se exigida) antes de submeter.
         // A captura via PhotoCaptureScreen não acontece aqui, então fazemos aqui.
-        await _captureLocationIfRequired(formProvider);
+        final temLocalizacao = await _captureLocationIfRequired(formProvider);
+        if (!temLocalizacao) {
+          // Sem coordenadas em questionário que as exige: não finaliza. O
+          // aplicador volta ao questionário com tudo preenchido preservado.
+          return;
+        }
         // Para questionários sem foto, submeter e navegar
         await _submitAndNavigate(formProvider);
       }
@@ -797,40 +848,86 @@ class _QuestionScreenState extends State<QuestionScreen> {
   /// mas o fluxo não passa pela PhotoCaptureScreen (que já captura por conta própria).
   /// Sem isso, questionários com "Capturar Localização" ligado e "Requer Foto"
   /// desligado nunca registravam as coordenadas.
-  Future<void> _captureLocationIfRequired(FormProvider formProvider) async {
-    if (!widget.questionnaire.requiresLocation) return;
+  ///
+  /// Retorna true quando é permitido finalizar: o questionário não exige
+  /// localização, ou as coordenadas foram efetivamente capturadas. Quando exige
+  /// e a captura falha, retorna false — a finalização fica bloqueada, com o
+  /// motivo exibido e a opção de tentar de novo (ver [_ensureLocationOrBlock]).
+  Future<bool> _captureLocationIfRequired(FormProvider formProvider) async {
+    if (!widget.questionnaire.requiresLocation) return true;
+    return _ensureLocationOrBlock(formProvider);
+  }
 
-    // Já capturada (ex.: edição com localização preservada)? Não recapturar.
-    if (formProvider.currentForm?.latitude != null) {
-      print('📍 Localização já definida, mantendo a existente');
-      return;
+  /// Tenta capturar as coordenadas em laço: a cada falha explica o motivo ao
+  /// aplicador e oferece tentar de novo. Só libera a finalização com as
+  /// coordenadas gravadas — ou com o formulário marcado como "Sem localização",
+  /// quando o aplicador decide concluir sem sinal de GPS.
+  Future<bool> _ensureLocationOrBlock(FormProvider formProvider) async {
+    // Edição: a localização é a da entrevista, nunca a do momento da
+    // correção. Se a entrevista ficou sem coordenadas, continua sem.
+    if (formProvider.isEditMode) {
+      print('📍 Edição - mantendo a localização original da entrevista');
+      return true;
     }
 
-    try {
-      final permission = await Permission.location.request();
-      print('📍 Permissão de localização: $permission');
-
-      if (!permission.isGranted) {
-        print('📍 Permissão de localização não concedida — seguindo sem coordenadas');
-        return;
+    while (true) {
+      // Já capturada (ex.: edição com localização preservada)? Não recapturar.
+      if (formProvider.currentForm?.latitude != null) {
+        print('📍 Localização já definida, mantendo a existente');
+        return true;
       }
 
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        print('📍 Serviço de localização desativado — seguindo sem coordenadas');
-        return;
+      final falha = await _tryCaptureLocation(formProvider);
+      if (falha == null) return true;
+
+      if (!mounted) return false;
+      final decisao = await showLocationRequiredDialog(context, falha);
+
+      switch (decisao) {
+        case LocationDialogAction.retry:
+          continue;
+        case LocationDialogAction.finishWithout:
+          formProvider.markLocationUnavailable();
+          print('📍 Finalizando sem coordenadas por decisão do aplicador');
+          return true;
+        case LocationDialogAction.cancel:
+        case null:
+          print('📍 Aplicador voltou ao questionário — não finalizou');
+          return false;
       }
-
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      ).timeout(const Duration(seconds: 15));
-
-      print('📍 Localização obtida: ${position.latitude}, ${position.longitude}');
-      formProvider.setLocation(position.latitude, position.longitude, '');
-    } catch (e) {
-      // Falha na captura não deve bloquear a submissão do formulário.
-      print('❌ Erro ao capturar localização: $e');
     }
+  }
+
+  /// Executa uma tentativa de captura. Retorna null em caso de sucesso, ou a
+  /// mensagem do motivo da falha (já escrita para o aplicador).
+  ///
+  /// A estratégia em etapas — e o motivo de cada uma — está em
+  /// [LocationService.obterPosicao].
+  Future<String?> _tryCaptureLocation(FormProvider formProvider) async {
+    // A busca pode levar dezenas de segundos; sem aviso, o aplicador acha que
+    // o app travou e sai da tela.
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Obtendo localização...'),
+          backgroundColor: Color(0xFF8FAE5D),
+          duration: Duration(seconds: 30),
+        ),
+      );
+    }
+
+    final resultado = await LocationService.obterPosicao();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+    }
+
+    if (resultado.ok) {
+      final p = resultado.position!;
+      formProvider.setLocation(p.latitude, p.longitude, '');
+      return null;
+    }
+    return resultado.erro;
   }
 
   Future<void> _submitAndNavigate(FormProvider formProvider) async {
@@ -871,7 +968,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
           Text(formProvider.isEditMode ? 'Atualizando respostas...' : 'Salvando respostas...'),
         ],
       ),
-      backgroundColor: const Color(0xFFE8962E),
+      backgroundColor: const Color(0xFF8FAE5D),
       duration: const Duration(seconds: 10),
     ),
   );
@@ -1035,8 +1132,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
         Provider.of<StratificationProvider>(context, listen: false);
     if (!stratProvider.hasStratification) return;
 
-    final alert =
-        stratProvider.stratification!.getQuotaAlert(questionId, optionValue);
+    final alert = stratProvider.getQuotaAlert(questionId, optionValue);
     if (alert == null) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1058,6 +1154,12 @@ class _QuestionScreenState extends State<QuestionScreen> {
   // ---------------------------------------------------------------------------
 
   Future<void> _startRecording() async {
+    // Web: gravação por segmentos com tela ativa, salvos no IndexedDB.
+    if (!PlatformCaps.hasContinuousAudioRecording) {
+      await _startWebSegment();
+      return;
+    }
+
     try {
       final status = await Permission.microphone.request();
       if (!status.isGranted) {
@@ -1098,6 +1200,123 @@ class _QuestionScreenState extends State<QuestionScreen> {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Web: gravação por segmentos (tela ativa)
+  // ---------------------------------------------------------------------------
+
+  /// Inicia um novo segmento de gravação na web. O prompt de microfone do
+  /// navegador aparece na primeira chamada.
+  Future<void> _startWebSegment() async {
+    try {
+      if (!await _audioRecorder.hasPermission()) {
+        print('🎤 Web: permissão de microfone negada — seguindo sem áudio');
+        return;
+      }
+
+      _webSessionId ??= DateTime.now().millisecondsSinceEpoch.toString();
+
+      // Safari grava mp4/aac; Chrome, webm/opus.
+      var encoder = AudioEncoder.aacLc;
+      if (await _audioRecorder.isEncoderSupported(encoder)) {
+        _webAudioExt = 'm4a';
+      } else {
+        encoder = AudioEncoder.opus;
+        _webAudioExt = 'webm';
+      }
+
+      await _audioRecorder.start(
+        RecordConfig(encoder: encoder, bitRate: 64000, sampleRate: 22050),
+        path: '',
+      );
+
+      _recordingTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) {
+          setState(() {
+            _recordingSeconds++;
+          });
+        }
+      });
+
+      // Sem corte periódico: a gravação corre do início ao fim do
+      // questionário, num arquivo só.
+      //
+      // Existia aqui um flush a cada 60 s, pensado para limitar a perda em um
+      // fechamento abrupto da página. O efeito colateral era grave: só o
+      // primeiro segmento é vinculado ao formulário (audio_path), e o painel
+      // ainda não recebe os demais — na prática, todo áudio depois do primeiro
+      // minuto sumia. Perder um minuto em caso raro custava menos que perder
+      // a entrevista inteira em todos os casos.
+
+      if (mounted) {
+        setState(() {
+          _isRecording = true;
+        });
+      }
+      print('🎤 Web: segmento iniciado (sessão $_webSessionId, .$_webAudioExt)');
+    } catch (e) {
+      print('❌ Web: erro ao iniciar gravação: $e');
+    }
+  }
+
+  /// Fecha o segmento atual e persiste no IndexedDB.
+  Future<void> _flushWebSegment() async {
+    if (!_isRecording) return;
+    try {
+      final blobUrl = await _audioRecorder.stop();
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+        });
+      }
+      if (blobUrl == null || blobUrl.isEmpty) return;
+
+      _webSegmentSeq++;
+      final filename =
+          'audio_web_${_webSessionId}_p$_webSegmentSeq.$_webAudioExt';
+      final size = await WebMediaStore.saveFromBlobUrl(
+        blobUrl: blobUrl,
+        filename: filename,
+        kind: 'audio',
+      );
+      _webFirstSegmentFilename ??= filename;
+      print('🎤 Web: segmento salvo — $filename ($size bytes)');
+    } catch (e) {
+      print('❌ Web: erro ao salvar segmento: $e');
+    }
+  }
+
+  /// Encerra a gravação web: fecha o áudio e retorna o nome do arquivo
+  /// vinculado ao formulário (audio_path).
+  ///
+  /// No caminho normal existe um arquivo só, do início ao fim do questionário.
+  /// Se houve interrupção (aba oculta/tela bloqueada), os arquivos seguintes
+  /// compartilham o mesmo prefixo de sessão.
+  Future<String?> _finishWebRecording() async {
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+    await _flushWebSegment();
+    final first = _webFirstSegmentFilename;
+    _webSessionId = null; // impede reinício via observer após finalizar
+    return first;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (PlatformCaps.hasContinuousAudioRecording) return;
+
+    // Web: aba oculta/tela bloqueada → fecha e salva o segmento atual
+    // (nada do que já foi falado se perde); ao voltar, novo segmento.
+    if (state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused) {
+      _flushWebSegment();
+    } else if (state == AppLifecycleState.resumed &&
+        !_isRecording &&
+        _webSessionId != null) {
+      _startWebSegment();
+    }
+  }
+
   Future<String?> _stopRecording() async {
     try {
       if (!_isRecording) return null;
@@ -1130,12 +1349,16 @@ class _QuestionScreenState extends State<QuestionScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    WakelockPlus.disable();
     _recordingTimer?.cancel();
     if (_isRecording) {
       _audioRecorder.stop();
     }
     _audioRecorder.dispose();
     _pageController.dispose();
+    // Manter o GPS ligado depois de sair da tela consome bateria à toa.
+    LocationService.pararAquecimento();
     super.dispose();
   }
 }

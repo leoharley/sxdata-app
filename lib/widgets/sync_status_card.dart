@@ -99,13 +99,13 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
             height: 40,
             decoration: BoxDecoration(
               color: _isOnline 
-                ? const Color(0xFFE8962E).withOpacity(0.1)
+                ? const Color(0xFF8FAE5D).withOpacity(0.1)
                 : Colors.red.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               _isOnline ? Icons.wifi : Icons.wifi_off,
-              color: _isOnline ? const Color(0xFFE8962E) : Colors.red,
+              color: _isOnline ? const Color(0xFF8FAE5D) : Colors.red,
               size: 20,
             ),
           ),
@@ -137,14 +137,14 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: _isOnline 
-                ? const Color(0xFFE8962E).withOpacity(0.1)
+                ? const Color(0xFF8FAE5D).withOpacity(0.1)
                 : Colors.red.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               _isOnline ? Icons.check_circle : Icons.error,
               size: 16,
-              color: _isOnline ? const Color(0xFFE8962E) : Colors.red,
+              color: _isOnline ? const Color(0xFF8FAE5D) : Colors.red,
             ),
           ),
         ],

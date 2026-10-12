@@ -14,7 +14,6 @@ import 'package:pdf/widgets.dart' as pw;
 import 'dart:math' as math;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -118,7 +117,7 @@ class _QuestionAnalysisScreenState extends State<QuestionAnalysisScreen> {
           const Icon(
             Icons.filter_alt,
             size: 16,
-            color: Color(0xFFE8962E),
+            color: Color(0xFF8FAE5D),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -213,7 +212,7 @@ class _QuestionAnalysisScreenState extends State<QuestionAnalysisScreen> {
       barrierDismissible: false,
       builder: (context) => const Center(
         child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8FAE5D)),
         ),
       ),
     );
@@ -293,7 +292,7 @@ Future<void> _exportDataWeb(String format) async {
       barrierDismissible: false,
       builder: (context) => const Center(
         child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8FAE5D)),
         ),
       ),
     );
@@ -343,7 +342,7 @@ Future<void> _exportDataWeb(String format) async {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Download iniciado: $fileName\nTamanho: ${(bytes.length / 1024).toStringAsFixed(2)} KB'),
-        backgroundColor: const Color(0xFFE8962E),
+        backgroundColor: const Color(0xFF8FAE5D),
         duration: const Duration(seconds: 3),
         action: SnackBarAction(
           label: 'OK',
@@ -1323,7 +1322,7 @@ Future<void> _shareFile(String filePath, String format) async {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.share, color: Color(0xFFE8962E)),
+                leading: const Icon(Icons.share, color: Color(0xFF8FAE5D)),
                 title: const Text('Compartilhar arquivo'),
                 subtitle: const Text('Via apps instalados'),
                 onTap: () {
@@ -1406,7 +1405,7 @@ Future<void> _shareFileMobile(String filePath) async {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Arquivo compartilhado com sucesso!'),
-          backgroundColor: Color(0xFFE8962E),
+          backgroundColor: Color(0xFF8FAE5D),
         ),
       );
     }
@@ -1436,7 +1435,7 @@ Future<void> _downloadFile(String filePath, String format) async {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Download iniciado: $fileName'),
-          backgroundColor: const Color(0xFFE8962E),
+          backgroundColor: const Color(0xFF8FAE5D),
           duration: const Duration(seconds: 5),
         ),
       );
@@ -1478,7 +1477,7 @@ Future<void> _downloadFile(String filePath, String format) async {
               icon: const Icon(Icons.share),
               label: const Text('Compartilhar'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE8962E),
+                backgroundColor: const Color(0xFF8FAE5D),
                 foregroundColor: Colors.white,
               ),
             ),
@@ -1504,7 +1503,7 @@ Future<void> _copyPathToClipboard(String filePath) async {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Caminho do arquivo:\n$filePath'),
-        backgroundColor: const Color(0xFFE8962E),
+        backgroundColor: const Color(0xFF8FAE5D),
         duration: const Duration(seconds: 10),
         action: SnackBarAction(
           label: 'OK',
@@ -1532,13 +1531,15 @@ String _escapeCsvField(String field) {
 
 // 9. Adicione este método para solicitar permissões (adicione no initState):
 
+/// Não pede permissão de armazenamento: a exportação grava em
+/// getApplicationDocumentsDirectory() (área interna do app, que nunca exigiu
+/// permissão) e entrega o arquivo por Share.shareXFiles.
+///
+/// O pedido anterior incluía MANAGE_EXTERNAL_STORAGE ("acesso a todos os
+/// arquivos"), que o Google restringe e que contribui para alertas do Play
+/// Protect — sem que o app precisasse dele.
 Future<void> _requestPermissions() async {
-  if (Platform.isAndroid) {
-    await [
-      Permission.storage,
-      Permission.manageExternalStorage,
-    ].request();
-  }
+  // Intencionalmente vazio.
 }
 
   @override
@@ -1568,7 +1569,7 @@ Future<void> _requestPermissions() async {
                         ),
                       ),
                       Image.asset(
-                        'assets/images/logo_alveslima.png',
+                        'assets/images/logo_socialx.png',
                         width: 120,
                         fit: BoxFit.contain,
                       ),
@@ -1602,7 +1603,7 @@ Future<void> _requestPermissions() async {
                                     width: 8,
                                     height: 8,
                                     decoration: const BoxDecoration(
-                                      color: Color(0xFFE8962E),
+                                      color: Color(0xFF8FAE5D),
                                       shape: BoxShape.circle,
                                     ),
                                   ),
@@ -1666,7 +1667,7 @@ Future<void> _requestPermissions() async {
                                       )
                                     : const Icon(
                                         Icons.refresh,
-                                        color: Color(0xFFE8962E),
+                                        color: Color(0xFF8FAE5D),
                                         size: 24,
                                       ),
                               );
@@ -1702,7 +1703,7 @@ Future<void> _requestPermissions() async {
         if (provider.isLoading) {
           return const Center(
             child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8FAE5D)),
             ),
           );
         }
@@ -1741,7 +1742,7 @@ Future<void> _requestPermissions() async {
                   icon: const Icon(Icons.refresh),
                   label: const Text('Tentar Novamente'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE8962E),
+                    backgroundColor: const Color(0xFF8FAE5D),
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -1833,7 +1834,7 @@ Future<void> _requestPermissions() async {
                 icon: const Icon(Icons.clear_all),
                 label: const Text('Limpar Filtros'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE8962E),
+                  backgroundColor: const Color(0xFF8FAE5D),
                   foregroundColor: Colors.white,
                 ),
               ),
@@ -1843,7 +1844,7 @@ Future<void> _requestPermissions() async {
                 icon: const Icon(Icons.refresh),
                 label: const Text('Recarregar'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFE8962E),
+                  foregroundColor: const Color(0xFF8FAE5D),
                 ),
               ),
             ],
@@ -1889,12 +1890,12 @@ Future<void> _requestPermissions() async {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8962E).withOpacity(0.1),
+                      color: const Color(0xFF8FAE5D).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(
                       Icons.quiz,
-                      color: Color(0xFFE8962E),
+                      color: Color(0xFF8FAE5D),
                       size: 20,
                     ),
                   ),
@@ -1954,7 +1955,7 @@ Future<void> _requestPermissions() async {
                       'Respostas',
                       '${questionnaire.totalResponses}',
                       Icons.people_outline,
-                      const Color(0xFFE8962E),
+                      const Color(0xFF8FAE5D),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -2039,9 +2040,9 @@ Future<void> _requestPermissions() async {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFE8962E).withOpacity(0.1),
+            color: const Color(0xFF8FAE5D).withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE8962E).withOpacity(0.3)),
+            border: Border.all(color: const Color(0xFF8FAE5D).withOpacity(0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2085,7 +2086,7 @@ Future<void> _requestPermissions() async {
                       'Respostas',
                       '$effectiveTotalResponses',
                       Icons.people_outlined,
-                      const Color(0xFFE8962E),
+                      const Color(0xFF8FAE5D),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -2110,7 +2111,7 @@ Future<void> _requestPermissions() async {
           child: provider.isLoadingDetail
               ? const Center(
                   child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8FAE5D)),
                   ),
                 )
               : ListView(
@@ -2404,7 +2405,7 @@ Future<void> _requestPermissions() async {
       case 'radio':
         return Colors.blue;
       case 'checkbox':
-        return const Color(0xFFE8962E);
+        return const Color(0xFF8FAE5D);
       case 'text':
       case 'textarea':
         return Colors.orange;

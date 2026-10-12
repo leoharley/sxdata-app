@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../providers/auth_provider.dart';
 import '../providers/questionnaire_provider.dart';
 import '../providers/form_provider.dart'; // Adicionar import do FormProvider
@@ -10,11 +13,11 @@ import '../widgets/stats_cards.dart';
 import '../widgets/questionnaire_list.dart';
 import '../services/local_storage_service.dart';
 import '../models/form_response.dart';
-import '../models/question_response.dart';
 import 'questionnaire_preview_screen.dart';
 import 'question_screen.dart';
 import 'profile_screen.dart';
 import 'history_screen.dart';
+import 'sent_forms_screen.dart';
 import 'settings_screen.dart';
 import 'stats_screen.dart';
 import 'stats_graphs_screen.dart';
@@ -29,8 +32,14 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with WidgetsBindingObserver {
   List<FormResponse> _pendingForms = [];
+
+  /// Quantas coletas já foram confirmadas pelo painel. Vem de uma contagem
+  /// sobre o JSON, sem instanciar as coletas — elas só são carregadas ao
+  /// abrir a tela de enviadas.
+  int _syncedCount = 0;
   bool _loadingPendingForms = true;
   bool _isSyncing = false;
   Map<String, int> _photosStats = {
@@ -40,11 +49,89 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'error': 0,
   };
   bool _loadingPhotosStats = true;
+  String _appVersion = '';
+  StreamSubscription<ConnectivityResult>? _connectivitySub;
+  bool _hasNetwork = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadData();
+    _loadAppVersion();
+    _watchConnectivity();
+  }
+
+  /// O app pode ficar aberto em segundo plano por horas. Ao voltar ao
+  /// primeiro plano, recarrega a lista para refletir o que mudou no painel
+  /// (ex.: questionário desativado) sem depender de fechar e abrir o app.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _hasNetwork) {
+      print('▶️ App em primeiro plano — atualizando questionários do painel');
+      Provider.of<QuestionnaireProvider>(context, listen: false)
+          .loadQuestionnaires();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _connectivitySub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _appVersion = info.version;
+        });
+      }
+    } catch (e) {
+      print('❌ Erro ao obter versão do app: $e');
+    }
+  }
+
+  /// Observa a conectividade: quando a rede volta, recarrega os questionários
+  /// do painel automaticamente, para que ajustes feitos lá (ex.: "requer foto",
+  /// alteração de pergunta) cheguem ao app sem depender do Sincronizar manual.
+  /// A sincronização de RESPOSTAS continua sendo apenas pelo botão.
+  Future<void> _watchConnectivity() async {
+    try {
+      final initial = await Connectivity().checkConnectivity();
+      _hasNetwork = initial != ConnectivityResult.none;
+    } catch (e) {
+      print('❌ Erro ao checar conectividade inicial: $e');
+    }
+
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((result) {
+      final hasNetwork = result != ConnectivityResult.none;
+      if (hasNetwork && !_hasNetwork) {
+        print('🌐 Rede detectada — atualizando questionários do painel');
+        _refreshQuestionnairesOnReconnect();
+      }
+      _hasNetwork = hasNetwork;
+    });
+  }
+
+  Future<void> _refreshQuestionnairesOnReconnect() async {
+    final questionnaireProvider = Provider.of<QuestionnaireProvider>(
+      context,
+      listen: false,
+    );
+    await questionnaireProvider.loadQuestionnaires();
+
+    if (mounted && questionnaireProvider.error == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Questionários atualizados com o painel'),
+          backgroundColor: Color(0xFF8FAE5D),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _loadData() async {
@@ -79,8 +166,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Usar o FormProvider para buscar formulários pendentes
       final formProvider = Provider.of<FormProvider>(context, listen: false);
 
-      // Debug do storage antes de carregar
-      await formProvider.debugPrintLocalStorage();
+      // Sem debugPrintLocalStorage() aqui: ele carregava TODAS as coletas
+      // (inclusive as já enviadas) só para imprimir, dobrando o trabalho de
+      // abrir a tela e piorando conforme a lista cresce em campo.
 
       // Buscar formulários pendentes usando o FormProvider
       final pendingForms = await formProvider.getPendingForms();
@@ -106,8 +194,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
       }
 
+      // Contagem leve: não carrega as coletas enviadas, só conta.
+      final counts = await formProvider.getFormCounts();
+
       setState(() {
         _pendingForms = pendingForms;
+        _syncedCount = counts['synced'] ?? 0;
         _loadingPendingForms = false;
       });
     } catch (e, stackTrace) {
@@ -117,18 +209,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Fallback: tentar carregar diretamente do LocalStorageService
       try {
         print('🔄 Tentando fallback direto do LocalStorageService...');
-        final allForms = await LocalStorageService.getFormResponses();
-
-        final pendingForms = allForms.where((form) {
-          final isPending =
-              form.syncStatus == 'pending' ||
-              form.syncStatus == 'offline' ||
-              form.syncStatus == 'error';
-          print(
-            '📋 Form ID: ${form.id}, Status: ${form.syncStatus}, Pending: $isPending',
-          );
-          return isPending;
-        }).toList();
+        // Só os estados que ainda precisam subir. Coletas já confirmadas
+        // pelo painel não entram aqui — elas ficam na tela "Enviadas".
+        final pendingForms = [
+          ...await LocalStorageService.getFormResponsesByStatus('pending'),
+          ...await LocalStorageService.getFormResponsesByStatus('offline'),
+          ...await LocalStorageService.getFormResponsesByStatus('error'),
+        ];
 
         print(
           '✅ Fallback: Encontrados ${pendingForms.length} formulários pendentes',
@@ -188,6 +275,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   _buildWelcomeCard(user),
                                   const SizedBox(height: 20),
                                   _buildPendingFormsCard(),
+                                  if (_syncedCount > 0) ...[
+                                    const SizedBox(height: 20),
+                                    _buildSentFormsCard(),
+                                  ],
                                   const SizedBox(height: 20),
                                   _buildManagementOptions(context),
                                   const SizedBox(height: 20),
@@ -204,6 +295,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               padding: const EdgeInsets.all(20),
                               child: Column(
                                 children: [
+                                  _buildSessaoExpiradaBanner(),
                                   const SyncStatusCard(),
 
                                   /* const SizedBox(height: 10),
@@ -211,6 +303,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   const SizedBox(height: 20),
                                   // Card de Formulários Pendentes
                                   _buildPendingFormsCard(),
+                                  // Coletas já confirmadas pelo painel.
+                                  // Card próprio: continua acessível mesmo
+                                  // com a fila de pendentes zerada.
+                                  if (_syncedCount > 0) ...[
+                                    const SizedBox(height: 20),
+                                    _buildSentFormsCard(),
+                                  ],
                                   const SizedBox(height: 20),
                                   Consumer<QuestionnaireProvider>(
                                     builder: (context, provider, child) {
@@ -244,6 +343,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   ),
                                   const SizedBox(height: 15),
                                 ],
+                                // Avisa quando a lista veio do cache: nesse
+                                // estado ela pode conter questionários já
+                                // desativados no painel.
+                                Consumer<QuestionnaireProvider>(
+                                  builder: (context, provider, child) {
+                                    if (!provider.isFromCache) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return Container(
+                                      width: double.infinity,
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F6EA),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Row(
+                                        children: [
+                                          Icon(Icons.cloud_off,
+                                              size: 16,
+                                              color: Color(0xFF8FAE5D)),
+                                          SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Lista salva no aparelho. Conecte-se '
+                                              'para ver os questionários atuais.',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF5A7536),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
                                 Consumer<QuestionnaireProvider>(
                                   builder: (context, provider, child) {
                                     if (provider.isLoading) {
@@ -303,8 +439,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
 
-                        // Espaçamento extra no final
-                        const SliverToBoxAdapter(child: SizedBox(height: 20)),
+                        // Versão do aplicativo
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: Text(
+                                _appVersion.isEmpty
+                                    ? ''
+                                    : 'Versão $_appVersion',
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -353,6 +504,169 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  /// Aviso fixo no topo enquanto o servidor considerar a sessão vencida.
+  ///
+  /// A sessão continua valendo localmente de propósito — derrubá-la tiraria o
+  /// acesso ao que ainda não subiu. Mas o aplicador precisa saber, e um
+  /// snackbar não serve: some em segundos e ele volta a coletar um dia inteiro
+  /// de trabalho que não vai sincronizar.
+  Widget _buildSessaoExpiradaBanner() {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, _) {
+        if (!authProvider.sessaoRejeitadaPeloServidor) {
+          return const SizedBox.shrink();
+        }
+
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFDECEA),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFD32F2F), width: 1.2),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.lock_clock, color: Color(0xFFD32F2F), size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Sessão expirada',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFB71C1C),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Seus questionários continuam salvos no aparelho, mas '
+                      'não vão subir para o painel até você entrar de novo.',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF7F2A25)),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context)
+                              .pushReplacementNamed('/login');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD32F2F),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'FAZER LOGIN NOVAMENTE',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Acesso às coletas já confirmadas pelo painel.
+  ///
+  /// Card próprio, FORA do card de pendentes: aquele esconde o conteúdo
+  /// quando a fila zera, e o link ia junto — justamente quando o aplicador
+  /// mais quer conferir o que foi enviado.
+  ///
+  /// As coletas não são carregadas aqui: só o contador, lido sem instanciar
+  /// os objetos. A lista é montada ao abrir a tela.
+  Widget _buildSentFormsCard() {
+    if (_syncedCount == 0) return const SizedBox.shrink();
+
+    return GestureDetector(
+      onTap: _navigateToSentForms,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF198754).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.verified,
+                    color: Color(0xFF198754), size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Coletas Enviadas',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF23345F),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Confirmadas pelo painel',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF198754).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$_syncedCount',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF198754),
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPendingFormsCard() {
     final totalPendingItems =
         _pendingForms.length + (_photosStats['pending'] ?? 0);
@@ -382,14 +696,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   decoration: BoxDecoration(
                     color: totalPendingItems > 0
                         ? Colors.orange.withOpacity(0.1)
-                        : const Color(0xFFE8962E).withOpacity(0.1),
+                        : const Color(0xFF8FAE5D).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     totalPendingItems > 0
                         ? Icons.cloud_upload_outlined
                         : Icons.cloud_done_outlined,
-                    color: totalPendingItems > 0 ? Colors.orange : const Color(0xFFE8962E),
+                    color: totalPendingItems > 0 ? Colors.orange : const Color(0xFF8FAE5D),
                     size: 20,
                   ),
                 ),
@@ -436,7 +750,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     decoration: BoxDecoration(
                       color: totalPendingItems > 0
                           ? Colors.orange.withOpacity(0.1)
-                          : const Color(0xFFE8962E).withOpacity(0.1),
+                          : const Color(0xFF8FAE5D).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -446,7 +760,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         fontWeight: FontWeight.bold,
                         color: totalPendingItems > 0
                             ? Colors.orange
-                            : const Color(0xFFE8962E),
+                            : const Color(0xFF8FAE5D),
                       ),
                     ),
                   ),
@@ -506,7 +820,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           'Ver todos os formulários (${_pendingForms.length})',
                           style: const TextStyle(
                             fontSize: 12,
-                            color: Color(0xFFE8962E),
+                            color: Color(0xFF8FAE5D),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -514,7 +828,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         const Icon(
                           Icons.keyboard_arrow_down,
                           size: 16,
-                          color: Color(0xFFE8962E),
+                          color: Color(0xFF8FAE5D),
                         ),
                       ],
                     ),
@@ -551,24 +865,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             await _loadPendingForms();
 
                             if (mounted) {
+                              final erro = formProvider.lastSyncError;
+
+                              // Sessão expirada precisa de um caminho de saída:
+                              // sem isso, o aplicador tentava sincronizar em
+                              // laço achando que era falta de sinal.
+                              final isTokenError = erro != null &&
+                                  (erro.contains('HTTP 401') ||
+                                      erro.contains('401') ||
+                                      erro.contains('Invalid token') ||
+                                      erro.contains('Token expirado'));
+
+                              if (isTokenError) {
+                                // Deixa o aviso permanente no topo até o
+                                // aplicador refazer o login: um snackbar some
+                                // em segundos e ele voltaria a coletar sem
+                                // saber que nada vai subir.
+                                Provider.of<AuthProvider>(context, listen: false)
+                                    .marcarSessaoExpirada();
+                              }
+
                               String message;
                               Color color;
 
                               if (formsResult > 0) {
                                 message = 'Sincronização concluída! $formsResult ${formsResult == 1 ? 'item sincronizado' : 'itens sincronizados'}';
-                                color = const Color(0xFFE8962E);
+                                color = const Color(0xFF8FAE5D);
+                              } else if (isTokenError) {
+                                message = 'Sessão expirada. Faça login novamente para sincronizar.';
+                                color = Colors.red;
+                              } else if (erro != null) {
+                                // Motivo real do servidor, em vez do genérico
+                                // "verifique sua conexão" que mandava o
+                                // aplicador procurar no lugar errado.
+                                message = 'Não sincronizou: $erro';
+                                color = Colors.red;
                               } else {
-                                message = 'Nenhum item foi sincronizado. Verifique sua conexão com a internet.';
+                                message = 'Nenhum item pendente para sincronizar.';
                                 color = Colors.orange;
                               }
 
-                              print('📱 Mostrando mensagem: $message (cor: ${formsResult > 0 ? 'verde' : 'laranja'})');
+                              print('📱 Mostrando mensagem: $message');
 
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(message),
                                   backgroundColor: color,
-                                  duration: const Duration(seconds: 4),
+                                  duration: Duration(
+                                    seconds: formsResult > 0 ? 4 : 8,
+                                  ),
+                                  action: isTokenError
+                                      ? SnackBarAction(
+                                          label: 'LOGIN',
+                                          textColor: Colors.white,
+                                          onPressed: () {
+                                            Navigator.of(context)
+                                                .pushReplacementNamed('/login');
+                                          },
+                                        )
+                                      : null,
                                 ),
                               );
                             }
@@ -615,7 +970,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE8962E),
+                    backgroundColor: const Color(0xFF8FAE5D),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -752,7 +1107,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           SnackBar(
                             content: Text('$result foto(s) sincronizada(s)'),
                             backgroundColor: result > 0
-                                ? const Color(0xFFE8962E)
+                                ? const Color(0xFF8FAE5D)
                                 : Colors.orange,
                           ),
                         );
@@ -836,7 +1191,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Dados recarregados'),
-                          backgroundColor: const Color(0xFFE8962E),
+                          backgroundColor: const Color(0xFF8FAE5D),
                         ),
                       );
                     }
@@ -847,7 +1202,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: TextStyle(fontSize: 12),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE8962E),
+                    backgroundColor: const Color(0xFF8FAE5D),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
@@ -1036,23 +1391,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       print('📝 Questionário ID: ${form.questionnaireId}');
       print('📝 Número de respostas: ${form.responses.length}');
 
-      // Converter List<QuestionResponse> para Map<int, QuestionResponse>
-      final responsesMap = <int, QuestionResponse>{};
-      for (final response in form.responses) {
-        responsesMap[response.questionId] = response;
-      }
-
-      // Carregar as respostas existentes
-      formProvider.loadExistingResponses(responsesMap);
-
-      // Definir que estamos em modo de edição
-      if (form.id != null) {
-        formProvider.setEditMode(form.id.toString());
-        print('✅ Modo de edição ativado com ID: ${form.id}');
-      } else {
+      if (form.id == null) {
         print('❌ ERRO: Formulário sem ID não pode ser editado');
         return;
       }
+
+      // Carrega o formulário INTEIRO, não só as respostas. Antes só as
+      // respostas eram carregadas: a tela de questões reaproveitava o último
+      // formulário em memória (ou criava um vazio), e a edição saía com as
+      // coordenadas, datas e fotos de outra entrevista — ou com a posição do
+      // momento da edição. Várias coletas editadas no mesmo lugar ficavam com
+      // a mesma coordenada.
+      formProvider.setEditMode(form.id.toString());
+      formProvider.loadFormForEdit(form, questionnaire);
+      print('✅ Modo de edição ativado com ID: ${form.id}');
 
       // Navegar para a tela de questões
       if (!mounted) return;
@@ -1079,7 +1431,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Questionário editado com sucesso!'),
-              backgroundColor: const Color(0xFFE8962E),
+              backgroundColor: const Color(0xFF8FAE5D),
               duration: Duration(seconds: 2),
             ),
           );
@@ -1133,7 +1485,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ? '$syncedCount formulário${syncedCount != 1 ? 's' : ''} sincronizado${syncedCount != 1 ? 's' : ''} com sucesso!'
                   : 'Nenhum formulário foi sincronizado. Verifique a conexão.',
             ),
-            backgroundColor: syncedCount > 0 ? const Color(0xFFE8962E) : Colors.orange,
+            backgroundColor: syncedCount > 0 ? const Color(0xFF8FAE5D) : Colors.orange,
             duration: const Duration(seconds: 3),
           ),
         );
@@ -1198,7 +1550,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ? '✅ Teste PASSOU: Salvamento funcionando!'
                   : '❌ Teste FALHOU: Problema no salvamento',
             ),
-            backgroundColor: testResult ? const Color(0xFFE8962E) : Colors.red,
+            backgroundColor: testResult ? const Color(0xFF8FAE5D) : Colors.red,
             duration: const Duration(seconds: 3),
           ),
         );
@@ -1267,12 +1619,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFE8962E), Color(0xFFBF6D16)],
+          colors: [Color(0xFF8FAE5D), Color(0xFF5A7536)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFE8962E).withOpacity(0.3),
+            color: const Color(0xFF8FAE5D).withOpacity(0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -1359,7 +1711,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: Icons.analytics,
             title: 'Estatísticas Gerais',
             subtitle: 'Relatórios e métricas',
-            color: const Color(0xFFE8962E),
+            color: const Color(0xFF8FAE5D),
             onTap: () => _navigateToStats(context),
           ),
           _buildManagementOption(
@@ -1512,7 +1864,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         'Total Formulários',
                         '${stats?.totalForms ?? 0}',
                         Icons.assignment,
-                        const Color(0xFFE8962E),
+                        const Color(0xFF8FAE5D),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -1530,7 +1882,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         'Sucesso',
                         '${stats?.successRate ?? 0}%',
                         Icons.check_circle,
-                        const Color(0xFFE8962E),
+                        const Color(0xFF8FAE5D),
                       ),
                     ),
                   ],
@@ -1596,6 +1948,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context,
       MaterialPageRoute(builder: (context) => const HistoryScreen()),
     );
+  }
+
+  _navigateToSentForms() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SentFormsScreen()),
+    );
+    // Ao voltar, atualiza os contadores (o usuário pode ter sincronizado).
+    if (mounted) await _loadPendingForms();
   }
 
   _navigateToSettings() {

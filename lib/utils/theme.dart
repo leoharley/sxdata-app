@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color primaryColor = Color(0xFFE8962E);
+  static const Color primaryColor = Color(0xFF8FAE5D);
   static const Color secondaryColor = Color(0xFF23345F);
   static const Color backgroundColor = Color(0xFFF5F5F5);
   static const Color surfaceColor = Colors.white;
   static const Color errorColor = Color(0xFFf44336);
 
   static ThemeData lightTheme = ThemeData(
-    primarySwatch: Colors.orange,
+    primarySwatch: Colors.green,
     primaryColor: primaryColor,
     scaffoldBackgroundColor: backgroundColor,
     appBarTheme: const AppBarTheme(

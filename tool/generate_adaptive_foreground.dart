@@ -8,8 +8,8 @@ import 'dart:io';
 import 'package:image/image.dart' as img;
 
 void main() {
-  final inputPath = 'assets/images/icone_alveslima.png';
-  final outputPath = 'assets/images/icone_alveslima_foreground.png';
+  final inputPath = 'assets/images/X.png';
+  final outputPath = 'assets/images/icone_socialx_foreground.png';
 
   print('Lendo $inputPath ...');
   final inputBytes = File(inputPath).readAsBytesSync();

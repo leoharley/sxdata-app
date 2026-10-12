@@ -129,7 +129,7 @@ class QuestionnaireList extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: questionnaire.status == 'active' 
-                    ? const Color(0xFFFFF3E0)
+                    ? const Color(0xFFF1F6EA)
                     : Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -142,7 +142,7 @@ class QuestionnaireList extends StatelessWidget {
                         : Icons.pause_circle,
                       size: 14,
                       color: questionnaire.status == 'active' 
-                        ? const Color(0xFFBF6D16)
+                        ? const Color(0xFF5A7536)
                         : Colors.orange.shade700,
                     ),
                     const SizedBox(width: 4),
@@ -152,7 +152,7 @@ class QuestionnaireList extends StatelessWidget {
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                         color: questionnaire.status == 'active' 
-                          ? const Color(0xFFBF6D16)
+                          ? const Color(0xFF5A7536)
                           : Colors.orange.shade700,
                       ),
                     ),

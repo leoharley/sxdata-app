@@ -44,14 +44,14 @@ class _ConsentScreenState extends State<ConsentScreen> {
                   ),
                   // Logo centralizado
                   Image.asset(
-                    'assets/images/logo_alveslima.png',
+                    'assets/images/logo_socialx.png',
                     width: 120,             
                     fit: BoxFit.contain,
                   ),
                   // Ícone de consentimento
                   const Icon(
                     Icons.assignment,
-                    color: Color(0xFFE8962E),
+                    color: Color(0xFF8FAE5D),
                     size: 24,
                   ),
                 ],
@@ -139,7 +139,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
                                       _consentGiven = value ?? false;
                                     });
                                   },
-                                  activeColor: const Color(0xFFE8962E),
+                                  activeColor: const Color(0xFF8FAE5D),
                                 ),
                                 const Expanded(
                                   child: Padding(
@@ -160,7 +160,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFFF3E0),
+                                color: const Color(0xFFF1F6EA),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Row(
@@ -168,7 +168,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
                                 children: [
                                   Icon(
                                     Icons.security,
-                                    color: Color(0xFFBF6D16),
+                                    color: Color(0xFF5A7536),
                                     size: 16,
                                   ),
                                   SizedBox(width: 8),
@@ -177,7 +177,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
                                       'Suas informações pessoais são protegidas pela LGPD (Lei Geral de Proteção de Dados Pessoais – Lei 13.709/2018). Os dados coletados serão utilizados exclusivamente para os fins desta pesquisa.',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Color(0xFFBF6D16),
+                                        color: Color(0xFF5A7536),
                                         height: 1.4,
                                       ),
                                     ),
@@ -224,7 +224,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
             child: ElevatedButton(
               onPressed: _consentGiven ? _acceptAndContinue : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE8962E),
+                backgroundColor: const Color(0xFF8FAE5D),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(

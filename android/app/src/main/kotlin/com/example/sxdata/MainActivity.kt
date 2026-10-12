@@ -1,4 +1,4 @@
-package com.example.appcoleta
+package com.example.sxdata
 
 import io.flutter.embedding.android.FlutterActivity
 

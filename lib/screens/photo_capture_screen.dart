@@ -4,8 +4,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
+import 'dart:typed_data';
 import '../models/questionnaire.dart';
 import '../providers/form_provider.dart';
+import '../services/platform_caps.dart';
+import '../services/location_service.dart';
+import '../services/image_downscaler/image_downscaler.dart';
+import '../services/web_media_store/web_media_store.dart';
+import '../widgets/location_required_dialog.dart';
 import 'form_completed_screen.dart';
 
 class PhotoCaptureScreen extends StatefulWidget {
@@ -20,10 +26,33 @@ class PhotoCaptureScreen extends StatefulWidget {
 class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
   File? _capturedPhoto;
   File? _capturedPhoto2; // Segunda foto
+  // Web: as fotos vivem em memória/IndexedDB (não há File no navegador)
+  Uint8List? _capturedPhotoBytes;
+  Uint8List? _capturedPhoto2Bytes;
+  String? _photoFilename;
+  String? _photo2Filename;
   Position? _currentPosition;
+
+  bool get _hasPhoto1 => _capturedPhoto != null || _capturedPhotoBytes != null;
+  bool get _hasPhoto2 =>
+      _capturedPhoto2 != null || _capturedPhoto2Bytes != null;
   bool _isLoadingLocation = false;
   bool _isNavigating = false;
   final ImagePicker _picker = ImagePicker();
+
+  /// Limites da foto de evidência.
+  ///
+  /// Sem eles a imagem vinha na resolução nativa da câmera (12 MP ≈
+  /// 4000x3000). O JPEG até cabe na memória, mas para EXIBIR o preview o
+  /// navegador descomprime para bitmap: 4000x3000x4 bytes ≈ 48 MB de uma
+  /// vez. Em aparelho de 2 GB rodando no navegador isso derruba a aba.
+  ///
+  /// 1600x1200 (≈2 MP) descomprime para ~7,7 MB e continua legível de
+  /// sobra para evidência de campo. O redimensionamento é feito pelo
+  /// próprio image_picker, ANTES de os bytes chegarem ao app.
+  static const double _maxPhotoWidth = 1600;
+  static const double _maxPhotoHeight = 1600;
+  static const int _photoQuality = 70;
 
   @override
   void initState() {
@@ -33,9 +62,26 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
     print('📍 Requer localização: ${widget.questionnaire.requiresLocation}');
     print('📸 Requer foto: ${widget.questionnaire.requiresPhoto}');
     
-    if (widget.questionnaire.requiresLocation) {
+    // Na edição não captura: a localização é a da entrevista original
+    final isEditMode =
+        Provider.of<FormProvider>(context, listen: false).isEditMode;
+    if (widget.questionnaire.requiresLocation && !isEditMode) {
       _getCurrentLocation();
     }
+  }
+
+  @override
+  void dispose() {
+    // Libera os bytes das fotos ao sair da tela. Eles já estão salvos no
+    // IndexedDB/arquivo; manter uma segunda cópia viva só pressiona a
+    // memória de aparelhos fracos durante o resto do questionário.
+    _capturedPhotoBytes = null;
+    _capturedPhoto2Bytes = null;
+    // O cache de imagens do Flutter guarda os bitmaps decodificados;
+    // sem limpar, eles sobrevivem à tela.
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+    super.dispose();
   }
 
   @override
@@ -65,14 +111,14 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
                   ),
                   // Logo centralizado
                   Image.asset(
-                    'assets/images/logo_alveslima.png',
+                    'assets/images/logo_socialx.png',
                     width: 120,             
                     fit: BoxFit.contain,
                   ),
                   // Ícone de câmera
                   const Icon(
                     Icons.camera_alt,
-                    color: Color(0xFFE8962E),
+                    color: Color(0xFF8FAE5D),
                     size: 24,
                   ),
                 ],
@@ -111,7 +157,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
                             
                             _buildPhotoCapture(),
 
-                            if (_capturedPhoto != null) ...[
+                            if (_hasPhoto1) ...[
                               const SizedBox(height: 20),
                               _buildCapturedPhoto(),
                             ],
@@ -130,7 +176,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
                             const SizedBox(height: 10),
                             _buildPhotoCapture2(),
 
-                            if (_capturedPhoto2 != null) ...[
+                            if (_hasPhoto2) ...[
                               const SizedBox(height: 20),
                               _buildCapturedPhoto2(),
                             ],
@@ -161,7 +207,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
         height: 150,
         decoration: BoxDecoration(
           border: Border.all(
-            color: const Color(0xFFE8962E),
+            color: const Color(0xFF8FAE5D),
             width: 2,
             style: BorderStyle.solid,
           ),
@@ -175,13 +221,13 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
               Icon(
                 Icons.camera_alt,
                 size: 60,
-                color: Color(0xFFE8962E),
+                color: Color(0xFF8FAE5D),
               ),
               SizedBox(height: 15),
               Text(
                 'Toque para capturar foto',
                 style: TextStyle(
-                  color: Color(0xFFE8962E),
+                  color: Color(0xFF8FAE5D),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -208,7 +254,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
         height: 150,
         decoration: BoxDecoration(
           border: Border.all(
-            color: const Color(0xFFE8962E),
+            color: const Color(0xFF8FAE5D),
             width: 2,
             style: BorderStyle.solid,
           ),
@@ -222,13 +268,13 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
               Icon(
                 Icons.camera_alt,
                 size: 60,
-                color: Color(0xFFE8962E),
+                color: Color(0xFF8FAE5D),
               ),
               SizedBox(height: 15),
               Text(
                 'Toque para capturar segunda foto',
                 style: TextStyle(
-                  color: Color(0xFFE8962E),
+                  color: Color(0xFF8FAE5D),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -267,7 +313,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.check_circle, color: Color(0xFFE8962E), size: 20),
+              Icon(Icons.check_circle, color: Color(0xFF8FAE5D), size: 20),
               SizedBox(width: 8),
               Text(
                 '📋 Foto capturada:',
@@ -285,14 +331,18 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               image: DecorationImage(
-                image: FileImage(_capturedPhoto!),
+                // O preview tem 120px de altura, mas sem ResizeImage o
+                // bitmap é decodificado em resolução plena. Decodificar já
+                // reduzido é o que mantém o uso de memória baixo em
+                // aparelhos fracos.
+                image: _thumb(_capturedPhotoBytes, _capturedPhoto),
                 fit: BoxFit.cover,
               ),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'IMG_${DateTime.now().millisecondsSinceEpoch}.jpg • ${(_capturedPhoto!.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB',
+            'IMG_${DateTime.now().millisecondsSinceEpoch}.jpg • ${((_capturedPhotoBytes?.length ?? _capturedPhoto!.lengthSync()) / (1024 * 1024)).toStringAsFixed(1)} MB',
             style: const TextStyle(
               color: Colors.grey,
               fontSize: 12,
@@ -325,7 +375,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
             children: [
               const Row(
                 children: [
-                  Icon(Icons.check_circle, color: Color(0xFFE8962E), size: 20),
+                  Icon(Icons.check_circle, color: Color(0xFF8FAE5D), size: 20),
                   SizedBox(width: 8),
                   Text(
                     '📋 Segunda foto capturada:',
@@ -337,7 +387,7 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
                 ],
               ),
               IconButton(
-                icon: const Icon(Icons.refresh, color: Color(0xFFE8962E)),
+                icon: const Icon(Icons.refresh, color: Color(0xFF8FAE5D)),
                 onPressed: _retakePhoto2,
                 tooltip: 'Refazer foto 2',
               ),
@@ -350,14 +400,14 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               image: DecorationImage(
-                image: FileImage(_capturedPhoto2!),
+                image: _thumb(_capturedPhoto2Bytes, _capturedPhoto2),
                 fit: BoxFit.cover,
               ),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'IMG2_${DateTime.now().millisecondsSinceEpoch}.jpg • ${(_capturedPhoto2!.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB',
+            'IMG2_${DateTime.now().millisecondsSinceEpoch}.jpg • ${((_capturedPhoto2Bytes?.length ?? _capturedPhoto2!.lengthSync()) / (1024 * 1024)).toStringAsFixed(1)} MB',
             style: const TextStyle(
               color: Colors.grey,
               fontSize: 12,
@@ -369,6 +419,37 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
   }
 
   Widget _buildLocationSection() {
+    final formProvider = Provider.of<FormProvider>(context, listen: false);
+    if (formProvider.isEditMode) {
+      // Edição não captura posição: mostra a que a entrevista registrou
+      final form = formProvider.currentForm;
+      final temCoordenadas = form?.latitude != null && form?.longitude != null;
+      return Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.lock_outline, color: Color(0xFF23345F), size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                temCoordenadas
+                    ? 'Localização da entrevista mantida: '
+                        '${form!.latitude!.toStringAsFixed(4)}, '
+                        '${form.longitude!.toStringAsFixed(4)}'
+                    : 'A entrevista foi registrada sem localização. '
+                        'A edição não altera a localização.',
+                style: const TextStyle(color: Color(0xFF23345F), fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (_isLoadingLocation) {
       return Container(
         padding: const EdgeInsets.all(20),
@@ -483,13 +564,13 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
   }
 
   Widget _buildActionButtons() {
-    final canFinish = !widget.questionnaire.requiresPhoto || _capturedPhoto != null;
-    
+    final canFinish = !widget.questionnaire.requiresPhoto || _hasPhoto1;
+
     return Padding(
       padding: const EdgeInsets.only(top: 20),
       child: Row(
         children: [
-          if (_capturedPhoto != null)
+          if (_hasPhoto1)
             Expanded(
               child: OutlinedButton(
                 onPressed: _isNavigating ? null : _retakePhoto,
@@ -503,16 +584,16 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
                 ),
               ),
             ),
-          
-          if (_capturedPhoto != null) const SizedBox(width: 10),
-          
+
+          if (_hasPhoto1) const SizedBox(width: 10),
+
           Expanded(
-            flex: _capturedPhoto != null ? 2 : 1,
+            flex: _hasPhoto1 ? 2 : 1,
             child: ElevatedButton(
               //onPressed: _isNavigating ? null : (canFinish ? _completeForm : null),
               onPressed: _completeForm,
               style: ElevatedButton.styleFrom(
-                backgroundColor: canFinish ? const Color(0xFFE8962E) : Colors.grey,
+                backgroundColor: canFinish ? const Color(0xFF8FAE5D) : Colors.grey,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
@@ -541,35 +622,86 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
 
   // Substitua o método _capturePhoto na photo_capture_screen.dart:
 
+  /// Provider de imagem para os previews, decodificando em tamanho reduzido.
+  ///
+  /// Sem o ResizeImage o Flutter decodifica a imagem inteira para o cache,
+  /// mesmo o preview tendo 120px. Em aparelho fraco é o que estoura a
+  /// memória logo após a captura.
+  ImageProvider _thumb(Uint8List? bytes, File? file) {
+    final ImageProvider base =
+        bytes != null ? MemoryImage(bytes) : FileImage(file!);
+    return ResizeImage(base, width: 640, allowUpscaling: false);
+  }
+
   Future<void> _capturePhoto() async {
     print('📸 Tentando capturar foto');
-    
+
     try {
-      final permission = await Permission.camera.request();
+      // Na web o prompt de câmera é do próprio navegador, no pickImage.
+      final permission = PlatformCaps.hasPermissionHandler
+          ? await Permission.camera.request()
+          : PermissionStatus.granted;
       print('📸 Permissão de câmera: $permission');
-      
+
       if (permission.isGranted) {
+        // No NATIVO o plugin redimensiona de forma eficiente, então os
+        // limites vão aqui. Na WEB eles são contraproducentes: o
+        // image_picker_for_web carrega a imagem inteira num
+        // HTMLImageElement (12 MP ≈ 48 MB) só para então reduzir — é o
+        // pico que derruba celular fraco. Lá a redução é feita pelo
+        // ImageDownscaler, com createImageBitmap.
         final XFile? photo = await _picker.pickImage(
           source: ImageSource.camera,
-          imageQuality: 80,
+          maxWidth: PlatformCaps.isWeb ? null : _maxPhotoWidth,
+          maxHeight: PlatformCaps.isWeb ? null : _maxPhotoHeight,
+          imageQuality: PlatformCaps.isWeb ? null : _photoQuality,
         );
-        
+
         if (photo != null) {
           print('📸 Foto capturada: ${photo.path}');
+
+          if (PlatformCaps.isWeb) {
+            // Web: reduzir ANTES de guardar. O createImageBitmap decodifica
+            // já no tamanho final, sem materializar o bitmap de 12 MP.
+            final brutos = await photo.readAsBytes();
+            final bytes = await ImageDownscaler.downscale(
+              brutos,
+              maxDimension: _maxPhotoWidth.toInt(),
+              quality: _photoQuality / 100,
+            );
+            final filename =
+                'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            // Foto anterior refeita? Remover a pendência órfã.
+            if (_photoFilename != null) {
+              await WebMediaStore.delete(_photoFilename!);
+            }
+            await WebMediaStore.save(
+                filename: filename, bytes: bytes, kind: 'photo');
+            setState(() {
+              _capturedPhotoBytes = bytes;
+              _photoFilename = filename;
+            });
+            if (mounted) {
+              Provider.of<FormProvider>(context, listen: false)
+                  .setPhoto(filename);
+            }
+            return;
+          }
+
           setState(() {
             _capturedPhoto = File(photo.path);
           });
-          
+
           try {
             final formProvider = Provider.of<FormProvider>(context, listen: false);
-            
+
             // NOVA LÓGICA: Não salvar imediatamente offline aqui
             // Apenas definir o caminho da foto no formulário
             formProvider.setPhoto(photo.path);
             print('✅ Caminho da foto definido no FormProvider');
-            
+
             // A foto será salva offline automaticamente durante a submissão do formulário
-            
+
           } catch (e) {
             print('❌ Erro ao definir foto no FormProvider: $e');
           }
@@ -604,8 +736,14 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
 
   void _retakePhoto() {
     print('🔄 Refazendo foto');
+    // Web: remover a pendência do IndexedDB para não subir foto órfã.
+    if (_photoFilename != null) {
+      WebMediaStore.delete(_photoFilename!);
+    }
     setState(() {
       _capturedPhoto = null;
+      _capturedPhotoBytes = null;
+      _photoFilename = null;
     });
   }
 
@@ -613,17 +751,54 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
     print('📸 Tentando capturar segunda foto');
 
     try {
-      final permission = await Permission.camera.request();
+      // Na web o prompt de câmera é do próprio navegador, no pickImage.
+      final permission = PlatformCaps.hasPermissionHandler
+          ? await Permission.camera.request()
+          : PermissionStatus.granted;
       print('📸 Permissão de câmera: $permission');
 
       if (permission.isGranted) {
+        // No NATIVO o plugin redimensiona de forma eficiente, então os
+        // limites vão aqui. Na WEB eles são contraproducentes: o
+        // image_picker_for_web carrega a imagem inteira num
+        // HTMLImageElement (12 MP ≈ 48 MB) só para então reduzir — é o
+        // pico que derruba celular fraco. Lá a redução é feita pelo
+        // ImageDownscaler, com createImageBitmap.
         final XFile? photo = await _picker.pickImage(
           source: ImageSource.camera,
-          imageQuality: 80,
+          maxWidth: PlatformCaps.isWeb ? null : _maxPhotoWidth,
+          maxHeight: PlatformCaps.isWeb ? null : _maxPhotoHeight,
+          imageQuality: PlatformCaps.isWeb ? null : _photoQuality,
         );
 
         if (photo != null) {
           print('📸 Segunda foto capturada: ${photo.path}');
+
+          if (PlatformCaps.isWeb) {
+            final brutos = await photo.readAsBytes();
+            final bytes = await ImageDownscaler.downscale(
+              brutos,
+              maxDimension: _maxPhotoWidth.toInt(),
+              quality: _photoQuality / 100,
+            );
+            final filename =
+                'photo2_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            if (_photo2Filename != null) {
+              await WebMediaStore.delete(_photo2Filename!);
+            }
+            await WebMediaStore.save(
+                filename: filename, bytes: bytes, kind: 'photo');
+            setState(() {
+              _capturedPhoto2Bytes = bytes;
+              _photo2Filename = filename;
+            });
+            if (mounted) {
+              Provider.of<FormProvider>(context, listen: false)
+                  .setPhoto2(filename);
+            }
+            return;
+          }
+
           setState(() {
             _capturedPhoto2 = File(photo.path);
           });
@@ -668,56 +843,109 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
 
   void _retakePhoto2() {
     print('🔄 Refazendo segunda foto');
+    // Web: remover a pendência do IndexedDB para não subir foto órfã.
+    if (_photo2Filename != null) {
+      WebMediaStore.delete(_photo2Filename!);
+    }
     setState(() {
       _capturedPhoto2 = null;
+      _capturedPhoto2Bytes = null;
+      _photo2Filename = null;
     });
   }
 
-  Future<void> _getCurrentLocation() async {
-    print('📍 Tentando obter localização');
-    
-    setState(() {
-      _isLoadingLocation = true;
-    });
+  /// Garante que há coordenadas gravadas no formulário antes de finalizar.
+  /// Tenta capturar em laço: a cada falha explica o motivo e oferece nova
+  /// tentativa. Retorna false apenas se o aplicador voltar sem finalizar —
+  /// se ele optar por concluir sem sinal, o formulário segue marcado como
+  /// "Sem localização".
+  Future<bool> _ensureLocationOrBlock() async {
+    final formProvider = Provider.of<FormProvider>(context, listen: false);
+
+    // Edição não exige nem captura localização: vale a da entrevista
+    if (formProvider.isEditMode) {
+      return true;
+    }
+
+    while (true) {
+      if (formProvider.currentForm?.latitude != null) {
+        print('📍 Localização já registrada no formulário');
+        return true;
+      }
+
+      final motivo = await _tryCaptureLocation(formProvider);
+      if (motivo == null) return true;
+
+      if (!mounted) return false;
+      final decisao = await showLocationRequiredDialog(context, motivo);
+
+      switch (decisao) {
+        case LocationDialogAction.retry:
+          continue;
+        case LocationDialogAction.finishWithout:
+          formProvider.markLocationUnavailable();
+          print('📍 Finalizando sem coordenadas por decisão do aplicador');
+          return true;
+        case LocationDialogAction.cancel:
+        case null:
+          print('📍 Aplicador cancelou — não finalizou');
+          return false;
+      }
+    }
+  }
+
+  /// Uma tentativa de captura. Retorna null em caso de sucesso, ou o motivo
+  /// da falha já escrito para o aplicador.
+  ///
+  /// A estratégia em etapas — e o motivo de cada uma — está em
+  /// [LocationService.obterPosicao].
+  Future<String?> _tryCaptureLocation(FormProvider formProvider) async {
+    if (mounted) {
+      setState(() {
+        _isLoadingLocation = true;
+      });
+    }
 
     try {
-      final permission = await Permission.location.request();
-      print('📍 Permissão de localização: $permission');
-      
-      if (permission.isGranted) {
-        final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
-        
-        print('📍 Localização obtida: ${position.latitude}, ${position.longitude}');
-        
-        setState(() {
-          _currentPosition = position;
-        });
-        
-        try {
-          final formProvider = Provider.of<FormProvider>(context, listen: false);
-          formProvider.setLocation(
-            position.latitude, 
-            position.longitude, 
-            ''
-          );
-          print('✅ Localização salva no FormProvider');
-        } catch (e) {
-          print('❌ Erro ao salvar localização no FormProvider: $e');
+      final resultado = await LocationService.obterPosicao();
+
+      if (resultado.ok) {
+        final p = resultado.position!;
+        formProvider.setLocation(p.latitude, p.longitude, '');
+        if (mounted) {
+          setState(() {
+            _currentPosition = p;
+          });
         }
-      } else {
-        print('❌ Permissão de localização negada');
+        return null;
       }
-    } catch (e, stackTrace) {
-      print('❌ Erro ao obter localização: $e');
-      print('📋 Stack trace: $stackTrace');
+      return resultado.erro;
     } finally {
       if (mounted) {
         setState(() {
           _isLoadingLocation = false;
         });
       }
+    }
+  }
+
+  /// Botão manual de localização desta tela. Usa a mesma escada de tentativas
+  /// da finalização, para não haver dois comportamentos diferentes de captura
+  /// no mesmo aplicativo.
+  Future<void> _getCurrentLocation() async {
+    print('📍 Tentando obter localização');
+
+    final formProvider = Provider.of<FormProvider>(context, listen: false);
+    final motivo = await _tryCaptureLocation(formProvider);
+
+    if (motivo != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(motivo),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 6),
+        ),
+      );
     }
   }
 
@@ -740,6 +968,16 @@ class _PhotoCaptureScreenState extends State<PhotoCaptureScreen> {
       );
       return;
     } */
+
+    // Localização obrigatória: não deixa finalizar sem coordenadas gravadas.
+    // Tenta capturar em laço, explicando a falha e oferecendo nova tentativa.
+    if (widget.questionnaire.requiresLocation) {
+      final temLocalizacao = await _ensureLocationOrBlock();
+      if (!temLocalizacao) {
+        print('📍 Finalização bloqueada: sem localização capturada');
+        return;
+      }
+    }
 
     setState(() {
       _isNavigating = true;

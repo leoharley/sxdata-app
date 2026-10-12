@@ -1,12 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/form_response.dart';
 import '../models/stratification.dart';
 
 class ApiService {
-  static const String baseUrl = 'https://institutoalveslima.com.br/painel/api';
+  static const String baseUrl = 'https://painel.sxdata.com.br/api';
   //static const String baseUrl = 'http://localhost/painel_sxdata/api';
 
   static Future<Map<String, String>> _getHeaders() async {
@@ -89,31 +91,99 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> submitForm(FormResponse form) async {
-    try {
-      final formJson = form.toJson();
+    final formJson = form.toJson();
 
-      // Debug: verificar se photo_path_2 está sendo enviado
-      print('📤 === ENVIANDO FORMULÁRIO PARA API ===');
-      print('📸 photo_path: ${formJson['photo_path']}');
-      print('📸 photo_path_2: ${formJson['photo_path_2']}');
-      print('📋 JSON completo: ${jsonEncode(formJson)}');
-
-      final response = await http.post(
-        Uri.parse('$baseUrl/forms/submit'),
-        headers: await _getHeaders(),
-        body: jsonEncode(formJson),
-      );
-
-      final responseData = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        return responseData;
-      } else {
-        throw Exception(responseData['message'] ?? 'Failed to submit form');
-      }
-    } catch (e) {
-      throw Exception('Failed to submit form: $e');
+    // IDs locais são timestamps (millisecondsSinceEpoch, ~10^12) gerados
+    // pelo app para controle offline — o servidor não os conhece e um
+    // INTEGER no banco nem comporta o valor, derrubando a sincronização.
+    // Só enviar o id quando for um id real do servidor (modo de edição).
+    final dynamic formId = formJson['id'];
+    if (formId is int && formId >= 100000000000) {
+      formJson.remove('id');
     }
+
+    // Debug: verificar se photo_path_2 está sendo enviado
+    print('📤 === ENVIANDO FORMULÁRIO PARA API ===');
+    print('📸 photo_path: ${formJson['photo_path']}');
+    print('📸 photo_path_2: ${formJson['photo_path_2']}');
+    print('📋 JSON completo: ${jsonEncode(formJson)}');
+
+    // Só a chamada de rede fica no try: os erros de resposta são levantados
+    // depois, fora dele. Com eles aqui dentro, o catch genérico os embrulhava
+    // de novo e a mensagem chegava como "Exception: Failed to submit form:
+    // Exception: Invalid token".
+    final http.Response response;
+    try {
+      response = await http
+          .post(
+            Uri.parse('$baseUrl/forms/submit'),
+            headers: await _getHeaders(),
+            body: jsonEncode(formJson),
+          )
+          // 60s: em 3G/4G ruim de campo, desistir cedo faz o app perder a
+          // resposta de um envio que o servidor ESTÁ gravando. O id vem só
+          // após o commit, então abortar antes disso custa a confirmação.
+          .timeout(const Duration(seconds: 60));
+    } on TimeoutException {
+      throw Exception(
+        'O servidor não respondeu em 60 segundos. A resposta continua '
+        'salva no aparelho — tente novamente com um sinal melhor.',
+      );
+    } catch (e) {
+      throw Exception('Sem conexão com o servidor: $e');
+    }
+
+    // A resposta nem sempre é JSON: erro 500 do PHP, página de manutenção ou
+    // um warning impresso antes do payload chegam como HTML. Decodificar
+    // direto estourava FormatException, que subia como se fosse falha de
+    // rede e escondia o problema real do servidor.
+    Map<String, dynamic>? responseData;
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) responseData = decoded;
+    } catch (_) {
+      // Tratado abaixo, com o status e um trecho do corpo.
+    }
+
+    if (response.statusCode == 200 && responseData != null) {
+      return responseData;
+    }
+
+    // Erros PERMANENTES: reenviar o mesmo corpo daria o mesmo resultado.
+    // Sinalizados para a fila não entrar em loop.
+    if (responseData != null) {
+      final msg = responseData['message']?.toString() ??
+          'o servidor recusou o envio';
+
+      // 413: payload acima do post_max_size.
+      if (response.statusCode == 413 ||
+          responseData['limit_exceeded'] == true) {
+        throw PermanentSubmitException(
+          'A resposta é grande demais para o servidor aceitar. '
+          'Avise o suporte — reenviar não resolve. ($msg)',
+          statusCode: response.statusCode,
+        );
+      }
+
+      // 400: JSON malformado gerado pelo app.
+      if (response.statusCode == 400 || responseData['json_error'] != null) {
+        throw PermanentSubmitException(
+          'O servidor não conseguiu ler esta resposta '
+          '(${responseData['json_error'] ?? msg}). Avise o suporte.',
+          statusCode: response.statusCode,
+        );
+      }
+
+      // 500 com fatal: a transação foi revertida, nada gravou. É seguro
+      // reenviar, então segue como erro comum (temporário).
+      throw Exception('HTTP ${response.statusCode}: $msg');
+    }
+
+    final trecho = response.body.trim().replaceAll(RegExp(r'\s+'), ' ');
+    throw Exception(
+      'HTTP ${response.statusCode} sem JSON válido: '
+      '${trecho.length > 160 ? '${trecho.substring(0, 160)}...' : trecho}',
+    );
   }
 
   static Future<Map<String, dynamic>> uploadPhoto(File photo) async {
@@ -138,6 +208,65 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Failed to upload photo: $e');
+    }
+  }
+
+  /// Upload de foto a partir de bytes (versão web — mídias vêm do
+  /// IndexedDB via WebMediaStore, não de arquivos).
+  static Future<Map<String, dynamic>> uploadPhotoBytes(
+      Uint8List bytes, String filename) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/photos/upload'),
+      );
+
+      final headers = await _getHeaders();
+      request.headers.addAll(headers);
+      request.files.add(
+        http.MultipartFile.fromBytes('photo', bytes, filename: filename),
+      );
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      final responseData = jsonDecode(responseBody);
+
+      if (response.statusCode == 200) {
+        return responseData;
+      } else {
+        throw Exception(responseData['message'] ?? 'Failed to upload photo');
+      }
+    } catch (e) {
+      throw Exception('Failed to upload photo: $e');
+    }
+  }
+
+  /// Upload de áudio a partir de bytes (versão web).
+  static Future<Map<String, dynamic>> uploadAudioBytes(
+      Uint8List bytes, String filename) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/audios/upload'),
+      );
+
+      final headers = await _getHeaders();
+      request.headers.addAll(headers);
+      request.files.add(
+        http.MultipartFile.fromBytes('audio', bytes, filename: filename),
+      );
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      final responseData = jsonDecode(responseBody);
+
+      if (response.statusCode == 200) {
+        return responseData;
+      } else {
+        throw Exception(responseData['message'] ?? 'Failed to upload audio');
+      }
+    } catch (e) {
+      throw Exception('Failed to upload audio: $e');
     }
   }
 
@@ -1212,15 +1341,32 @@ class ApiService {
     }
   }
 
-  /// Retorna os dados de estratificação de um questionário, ou null se não
-  /// houver estratificação configurada ou em caso de erro/offline.
-  static Future<StratificationData?> getStratification(
+  /// Busca a estratificação de um questionário.
+  ///
+  /// [questionnaireId] é o ID DO QUESTIONÁRIO, nunca o stratification_id nem
+  /// um id de coleta/resposta. São valores distintos e fáceis de confundir:
+  /// a estratificação de id 20 pertence ao questionário 6, e chamar
+  /// /api/stratification/20 devolve 200 com "stratifications":[].
+  ///
+  /// Retorna a LISTA de estratificações do questionário; lista vazia quer
+  /// dizer "nenhuma configurada". Erros de rede/HTTP/parse são lançados —
+  /// quem chama precisa distinguir os dois casos na tela.
+  ///
+  /// O token vai no header Authorization (via [_getHeaders]) e é ele que faz
+  /// o servidor decidir a visão: token de aplicador recebe SOMENTE as metas
+  /// dele (data.view_mode = "individual"); supervisor/admin recebe o geral.
+  /// Sem token vem a visão geral, o comportamento antigo.
+  ///
+  /// O app NUNCA envia ?applied_by: para um aplicador o servidor o ignora
+  /// por segurança, e o filtro é coisa das telas de supervisão no painel.
+  static Future<List<StratificationData>> getStratification(
       int questionnaireId) async {
     try {
       final url = '$baseUrl/stratification/$questionnaireId';
       final headers = await _getHeaders();
       print('📊 GET $url');
-      print('📊 Headers: $headers');
+      // Não logar o valor do token; só se ele foi enviado.
+      print('📊 Authorization enviado: ${headers.containsKey('Authorization')}');
 
       final response = await http
           .get(Uri.parse(url), headers: headers)
@@ -1236,9 +1382,14 @@ class ApiService {
           final data = responseData['data'];
           if (data == null) {
             print('📊 Resposta success=true mas data=null');
-            return null;
+            return const [];
           }
-          return StratificationData.fromJson(data as Map<String, dynamic>);
+          // O payload fica em data["stratifications"] (lista), NÃO na raiz.
+          final envelope = Map<String, dynamic>.from(data as Map);
+          final list = StratificationData.listFromEnvelope(envelope);
+          print('📊 Estratificações recebidas: ${list.length} '
+              '(view_mode: ${envelope['view_mode'] ?? 'geral'})');
+          return list;
         }
         print('📊 Resposta success=${responseData['success']} - message: ${responseData['message']}');
         throw Exception('API retornou success=false: ${responseData['message']}');
@@ -1254,6 +1405,22 @@ class ApiService {
       rethrow;
     }
   }
+}
+
+/// Falha em que reenviar o MESMO corpo não vai adiantar (413 por tamanho,
+/// 400 por JSON inválido).
+///
+/// A coleta continua salva no aparelho — nada é descartado —, mas a fila
+/// para de tentar em loop e avisa o aplicador, em vez de repetir a cada
+/// sincronização.
+class PermanentSubmitException implements Exception {
+  final String message;
+  final int? statusCode;
+
+  PermanentSubmitException(this.message, {this.statusCode});
+
+  @override
+  String toString() => message;
 }
 
 /// NOVA: Classe para exceções personalizadas da API

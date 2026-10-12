@@ -40,7 +40,7 @@ class AppHeader extends StatelessWidget {
                   Row(
                     children: [
                       Image.asset(
-                        'assets/images/logo_alveslima.png',
+                        'assets/images/logo_socialx.png',
                         width: 120,             
                         fit: BoxFit.contain,
                       ),

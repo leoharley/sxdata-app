@@ -194,7 +194,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Estado selecionado: $stateName'),
-        backgroundColor: const Color(0xFFE8962E),
+        backgroundColor: const Color(0xFF8FAE5D),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -345,7 +345,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                   ),
                 ],
               ),
-              backgroundColor: const Color(0xFFE8962E),
+              backgroundColor: const Color(0xFF8FAE5D),
               duration: const Duration(seconds: 5),
               action: SnackBarAction(
                 label: 'Voltar',
@@ -451,7 +451,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                               )
                             : const Icon(
                                 Icons.refresh,
-                                color: Color(0xFFE8962E),
+                                color: Color(0xFF8FAE5D),
                                 size: 24,
                               ),
                       );
@@ -526,7 +526,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                             icon: const Icon(Icons.my_location, size: 16),
                             label: const Text('Centralizar Brasil'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFE8962E),
+                              backgroundColor: const Color(0xFF8FAE5D),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 8),
                             ),
@@ -543,7 +543,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                           ),
                           label: Text(_showDataTable ? 'Ver Mapa' : 'Ver Dados'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _showDataTable ? const Color(0xFFE8962E) : Colors.blue,
+                            backgroundColor: _showDataTable ? const Color(0xFF8FAE5D) : Colors.blue,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
@@ -559,13 +559,13 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: const Color(0xFFE8962E).withOpacity(0.1),
+              color: const Color(0xFF8FAE5D).withOpacity(0.1),
               child: Row(
                 children: [
                   Icon(
                     _showDataTable ? Icons.table_chart : Icons.map,
                     size: 16,
-                    color: const Color(0xFFE8962E),
+                    color: const Color(0xFF8FAE5D),
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -581,7 +581,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                     _showDataTable ? 'Visualização Tabular' : '',
                     style: const TextStyle(
                       fontSize: 12,
-                      color: Color(0xFFE8962E),
+                      color: Color(0xFF8FAE5D),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -596,7 +596,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                   if (statsProvider.isLoading && _locationData.isEmpty) {
                     return const Center(
                       child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8FAE5D)),
                       ),
                     );
                   }
@@ -710,7 +710,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8962E),
+                    color: const Color(0xFF8FAE5D),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -731,7 +731,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
             child: SingleChildScrollView(
               child: DataTable(
                 headingRowColor: WidgetStateProperty.all(
-                  const Color(0xFFE8962E).withOpacity(0.1),
+                  const Color(0xFF8FAE5D).withOpacity(0.1),
                 ),
                 columns: const [
                   DataColumn(
@@ -801,7 +801,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                     intensityColor = Colors.yellow[700]!;
                   } else {
                     intensity = 'Mínimo';
-                    intensityColor = const Color(0xFFE8962E);
+                    intensityColor = const Color(0xFF8FAE5D);
                   }
 
                   return DataRow(
@@ -829,7 +829,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                                       child: Text(
                                         '${location.lat.toStringAsFixed(4)}°, ${location.lng.toStringAsFixed(4)}°',
                                         style: const TextStyle(
-                                          color: Color(0xFFE8962E),
+                                          color: Color(0xFF8FAE5D),
                                           fontWeight: FontWeight.w600,
                                           fontSize: 12,
                                           decoration: TextDecoration.underline,
@@ -860,7 +860,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFE8962E).withOpacity(0.1),
+                            color: const Color(0xFF8FAE5D).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -996,7 +996,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8FAE5D)),
                       ),
                       SizedBox(height: 16),
                       Text(
@@ -1018,7 +1018,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                 left: 10,
                 child: FloatingActionButton.small(
                   onPressed: _forceMapRefresh,
-                  backgroundColor: const Color(0xFFE8962E),
+                  backgroundColor: const Color(0xFF8FAE5D),
                   child: const Icon(Icons.refresh, color: Colors.white),
                 ),
               ),
@@ -1055,7 +1055,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                     _buildLegendItem('Alto (25+)', Colors.red[600]!),
                     _buildLegendItem('Médio (15-24)', Colors.orange[600]!),
                     _buildLegendItem('Baixo (5-14)', Colors.yellow[700]!),
-                    _buildLegendItem('Mínimo (1-4)', const Color(0xFFE8962E)),
+                    _buildLegendItem('Mínimo (1-4)', const Color(0xFF8FAE5D)),
                   ],
                 ),
               ),
@@ -1102,7 +1102,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
         markerColor = Colors.yellow[700]!;
         size = 14.0;
       } else {
-        markerColor = const Color(0xFFE8962E);
+        markerColor = const Color(0xFF8FAE5D);
         size = 12.0;
       }
 
@@ -1153,8 +1153,8 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
     return [
       Polygon(
         points: state.coordinates.map((coord) => LatLng(coord.latitude, coord.longitude)).toList(),
-        color: const Color(0xFFE8962E).withOpacity(0.3),
-        borderColor: const Color(0xFFE8962E),
+        color: const Color(0xFF8FAE5D).withOpacity(0.3),
+        borderColor: const Color(0xFF8FAE5D),
         borderStrokeWidth: 2,
         isFilled: true,
       ),
@@ -1185,7 +1185,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                     color: location.formsCount >= 25 ? Colors.red[600] :
                            location.formsCount >= 15 ? Colors.orange[600] :
                            location.formsCount >= 5 ? Colors.yellow[700] :
-                           const Color(0xFFE8962E),
+                           const Color(0xFF8FAE5D),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -1213,7 +1213,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE8962E),
+                  backgroundColor: const Color(0xFF8FAE5D),
                   foregroundColor: Colors.white,
                 ),
                 child: const Text('Fechar'),
@@ -1369,7 +1369,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
             children: [
               const Icon(
                 Icons.location_on,
-                color: Color(0xFFE8962E),
+                color: Color(0xFF8FAE5D),
                 size: 24,
               ),
               const SizedBox(width: 8),
@@ -1385,14 +1385,14 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8962E).withOpacity(0.1),
+                  color: const Color(0xFF8FAE5D).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '${stateData.length} registros',
                   style: const TextStyle(
                     fontSize: 12,
-                    color: Color(0xFFE8962E),
+                    color: Color(0xFF8FAE5D),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -1407,7 +1407,7 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
                   'Aplicadores',
                   '${applicatorsInState.length}',
                   Icons.people,
-                  const Color(0xFFE8962E),
+                  const Color(0xFF8FAE5D),
                 ),
               ),
               const SizedBox(width: 12),

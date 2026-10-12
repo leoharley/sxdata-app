@@ -1,8 +1,8 @@
-# Tutorial - Controle de Estratificacao da Amostra (AppColeta)
+# Tutorial - Controle de Estratificacao da Amostra (SXData)
 
 ## O que e?
 
-O Controle de Estratificacao e um recurso do AppColeta que permite acompanhar, em tempo real, as cotas de coleta por perfil demografico de cada questionario. Ele ajuda os aplicadores a saberem quantas entrevistas ainda sao necessarias em cada categoria (ex: faixa etaria, genero, regiao), evitando coletas excedentes.
+O Controle de Estratificacao e um recurso do SXData que permite acompanhar, em tempo real, as cotas de coleta por perfil demografico de cada questionario. Ele ajuda os aplicadores a saberem quantas entrevistas ainda sao necessarias em cada categoria (ex: faixa etaria, genero, regiao), evitando coletas excedentes.
 
 ---
 
@@ -19,7 +19,7 @@ Ao selecionar um questionario para aplicar, antes de iniciar a coleta, o aplicad
 - **Barra de Progresso Geral** - Mostra quantas entrevistas ja foram realizadas do total planejado (ex: `85/200 - 42.5%`)
 - **Categorias de Estratificacao** - Cada categoria (ex: "Faixa Etaria", "Genero") aparece com sua propria barra de progresso
 - **Detalhamento por Estrato** - Dentro de cada categoria, cada opcao (ex: "18-24 anos", "25-34 anos") mostra:
-  - Um icone de status: circulo vazio (pendente) ou check laranja (cota atingida)
+  - Um icone de status: circulo vazio (pendente) ou check verde (cota atingida)
   - O nome da opcao
   - Uma mini barra de progresso individual
   - A contagem atual/meta (ex: `15/30`)
@@ -96,4 +96,4 @@ A estratificacao e configurada pelo **administrador no painel web**, definindo:
 
 ---
 
-*Versao 2.0 - AppColeta*
+*Versao 2.0 - SXData*

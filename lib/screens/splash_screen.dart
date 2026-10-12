@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../providers/auth_provider.dart';
+import '../services/pwa_install/pwa_install.dart';
 import 'login_screen.dart';
 import 'dashboard_screen.dart';
 
@@ -13,10 +15,25 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  /// Lida do pubspec via PackageInfo, não escrita à mão: a versão fixa no
+  /// código ficava para trás a cada release e confundia o suporte em campo.
+  String _appVersion = '';
+
   @override
   void initState() {
     super.initState();
+    _loadAppVersion();
     _initializeApp();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) setState(() => _appVersion = info.version);
+    } catch (e) {
+      // Sem a versão a splash continua funcionando — só não a exibe.
+      if (kDebugMode) print('⚠️ Não foi possível obter a versão: $e');
+    }
   }
 
   Future<void> _initializeApp() async {
@@ -57,18 +74,31 @@ class _SplashScreenState extends State<SplashScreen> {
 
   void _navigateToNextScreen(bool isAuthenticated) {
     if (!mounted) return;
-    
+
+    // No navegador do celular o acesso é barrado na LoginScreen, que explica o
+    // motivo e oferece a instalação. Uma sessão salva pularia essa tela e
+    // entraria direto no dashboard, furando a regra — por isso mandamos para o
+    // login mesmo autenticado.
+    final bloqueadoNoNavegador = PwaInstall.disponivelNaPlataforma &&
+        PwaInstall.ehCelular &&
+        !PwaInstall.emModoApp;
+
+    final irParaDashboard = isAuthenticated && !bloqueadoNoNavegador;
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => isAuthenticated 
-          ? const DashboardScreen() 
+        builder: (context) => irParaDashboard
+          ? const DashboardScreen()
           : const LoginScreen(),
       ),
     );
-    
+
     if (kDebugMode) {
-      print('📱 Navegando para: ${isAuthenticated ? 'Dashboard' : 'Login'}');
+      print('📱 Navegando para: ${irParaDashboard ? 'Dashboard' : 'Login'}');
+      if (bloqueadoNoNavegador) {
+        print('🚫 Navegador do celular: acesso só pelo app instalado');
+      }
     }
   }
 
@@ -83,7 +113,7 @@ class _SplashScreenState extends State<SplashScreen> {
             children: [
               // Logo principal SOCIAL
               Image.asset(
-                'assets/images/logo_alveslima.png',
+                'assets/images/logo_socialx.png',
                 width: 200,
                 fit: BoxFit.contain,
               ),
@@ -91,7 +121,7 @@ class _SplashScreenState extends State<SplashScreen> {
               
               // X logo
               Image.asset(
-                'assets/images/icone_alveslima.png',
+                'assets/images/X.png',
                 width: 80,
                 fit: BoxFit.contain,
               ),
@@ -110,7 +140,7 @@ class _SplashScreenState extends State<SplashScreen> {
               
               // Loading indicator
               const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8962E)),
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8FAE5D)),
                 strokeWidth: 3,
               ),
               const SizedBox(height: 20),
@@ -142,9 +172,9 @@ class _SplashScreenState extends State<SplashScreen> {
               const SizedBox(height: 80),
               
               // Versão (posicionada mais baixo)
-              const Text(
-                'Versão: 2.0',
-                style: TextStyle(
+              Text(
+                _appVersion.isEmpty ? '' : 'Versão: $_appVersion',
+                style: const TextStyle(
                   fontSize: 12,
                   color: Colors.grey,
                 ),
