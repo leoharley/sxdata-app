@@ -5,12 +5,9 @@ import 'dart:io';
 import '../models/questionnaire.dart';
 import '../providers/form_provider.dart';
 import '../providers/auth_provider.dart';
-import '../services/api_service.dart';
 import 'dashboard_screen.dart';
 import 'questionnaire_preview_screen.dart';
-import '../services/photo_storage_service.dart';
 import '../services/local_storage_service.dart';
-import '../models/form_response.dart';
 import '../models/question_response.dart';
 
 class FormCompletedScreen extends StatefulWidget {
@@ -51,7 +48,6 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
   bool _isSubmitting = false;
   bool _isUploadingPhoto = false;
   String _statusMessage = 'Preparando submissão...';
-  String _photoUploadStatus = '';
   
   // Variáveis para preservar informações
   int _responseCount = 0;
@@ -61,18 +57,13 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
   bool _hasSyncedSuccessfully = false;
   bool _hasPhotoUploaded = false;
   File? _capturedPhoto;
-  String? _uploadedPhotoFilename;
   
   // Dados finais do formulário
-  int? _finalQuestionnaireId;
-  int? _finalAppliedBy;
-  bool _finalConsentGiven = false;
   Map<int, dynamic> _finalResponses = {};
   double? _finalLatitude;
   double? _finalLongitude;
   String? _finalLocationName;
   String? _finalPhotoPath;
-  DateTime? _finalStartedAt;
   DateTime? _finalCompletedAt;
 
   @override
@@ -142,15 +133,11 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
   }
 
   void _useParameterData() {
-    _finalQuestionnaireId = widget.preservedQuestionnaireId!;
-    _finalAppliedBy = widget.preservedAppliedBy!;
-    _finalConsentGiven = widget.preservedConsentGiven ?? false;
     _finalResponses = widget.preservedResponses ?? {};
     _finalLatitude = widget.preservedLatitude;
     _finalLongitude = widget.preservedLongitude;
     _finalLocationName = widget.preservedLocationName;
     _finalPhotoPath = widget.preservedPhotoPath;
-    _finalStartedAt = widget.preservedStartedAt;
     _finalCompletedAt = widget.preservedCompletedAt ?? DateTime.now();
     
     _responseCount = _finalResponses.length;
@@ -161,9 +148,6 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
   void _useFormProviderData(FormProvider formProvider) {
     final currentForm = formProvider.currentForm!;
     
-    _finalQuestionnaireId = currentForm.questionnaireId;
-    _finalAppliedBy = currentForm.appliedBy;
-    _finalConsentGiven = currentForm.consentGiven;
     _finalResponses = Map<int, dynamic>.from(
       formProvider.responses.map((key, value) => MapEntry(key, value.getValue()))
     );
@@ -171,7 +155,6 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
     _finalLongitude = currentForm.longitude;
     _finalLocationName = currentForm.locationName;
     _finalPhotoPath = currentForm.photoPath;
-    _finalStartedAt = currentForm.startedAt;
     _finalCompletedAt = DateTime.now();
     
     _responseCount = formProvider.responses.length;
@@ -182,9 +165,6 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
   void _useLastCompletedData(FormProvider formProvider) {
     final lastForm = formProvider.lastCompletedForm!;
     
-    _finalQuestionnaireId = lastForm.questionnaireId;
-    _finalAppliedBy = lastForm.appliedBy;
-    _finalConsentGiven = lastForm.consentGiven;
     _finalResponses = Map<int, dynamic>.from(
       formProvider.lastCompletedResponses.map((key, value) => MapEntry(key, value.getValue()))
     );
@@ -192,7 +172,6 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
     _finalLongitude = lastForm.longitude;
     _finalLocationName = lastForm.locationName;
     _finalPhotoPath = lastForm.photoPath;
-    _finalStartedAt = lastForm.startedAt;
     _finalCompletedAt = lastForm.completedAt ?? DateTime.now();
     
     _responseCount = formProvider.lastCompletedResponses.length;
@@ -221,9 +200,6 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
         
         print('✅ Formulário encontrado no localStorage');
         
-        _finalQuestionnaireId = recentForm.questionnaireId;
-        _finalAppliedBy = recentForm.appliedBy;
-        _finalConsentGiven = recentForm.consentGiven;
         _finalResponses = Map<int, dynamic>.from(
           recentForm.responses.asMap().map((index, response) => 
             MapEntry(response.questionId, response.getValue()))
@@ -232,7 +208,6 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
         _finalLongitude = recentForm.longitude;
         _finalLocationName = recentForm.locationName;
         _finalPhotoPath = recentForm.photoPath;
-        _finalStartedAt = recentForm.startedAt;
         _finalCompletedAt = recentForm.completedAt ?? DateTime.now();
         
         _responseCount = recentForm.responses.length;
@@ -259,15 +234,11 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
   void _useDefaultValues() {
     print('📋 Usando valores padrão');
     
-    _finalQuestionnaireId = widget.questionnaire.id;
-    _finalAppliedBy = 1; // Valor padrão - ajustar conforme necessário
-    _finalConsentGiven = true;
     _finalResponses = {};
     _finalLatitude = null;
     _finalLongitude = null;
     _finalLocationName = null;
     _finalPhotoPath = null;
-    _finalStartedAt = DateTime.now().subtract(const Duration(minutes: 5));
     _finalCompletedAt = DateTime.now();
     
     _responseCount = widget.questionnaire.questions.length;
@@ -373,62 +344,12 @@ class _FormCompletedScreenState extends State<FormCompletedScreen> {
         return;
       }
       
-      // Criar e salvar FormResponse com os dados capturados
-      print('📋 Criando FormResponse com dados capturados');
-      
-      final formResponse = FormResponse(
-        questionnaireId: _finalQuestionnaireId!,
-        appliedBy: _finalAppliedBy!,
-        consentGiven: _finalConsentGiven,
-        syncStatus: 'pending',
-        startedAt: _finalStartedAt ?? DateTime.now().subtract(const Duration(minutes: 5)),
-        completedAt: _finalCompletedAt ?? DateTime.now(),
-        responses: _finalResponses.entries.map((entry) {
-          return QuestionResponse(
-            questionId: entry.key,
-            responseText: entry.value?.toString(),
-          );
-        }).toList(),
-        latitude: _finalLatitude,
-        longitude: _finalLongitude,
-        locationName: _finalLocationName,
-        photoPath: _finalPhotoPath,
-      );
-      
-      // Salvar localmente
-
-    //COMENTADO PARA EVITAR SALVAR 2 VEZES LEOHARLEY
-    //  await LocalStorageService.saveFormResponse(formResponse);
-      
-      print('✅ Formulário salvo localmente');
-      
-      // Tentar sincronizar com servidor
-    /*  bool syncSuccess = false;
-      try {
-        final result = await ApiService.submitForm(formResponse);
-        if (result['success'] == true) {
-          syncSuccess = true;
-          print('✅ Formulário sincronizado com servidor');
-        }
-      } catch (e) {
-        print('⚠️ Erro na sincronização (modo offline): $e');
-        syncSuccess = false;
-      } 
-      
+      // O formulário já foi salvo no question_screen ao "Finalizar"
+      // (salvar aqui de novo duplicava a coleta); só encerra o envio.
       setState(() {
-        _hasSyncedSuccessfully = syncSuccess;
-        //COMENTADO PARA RESOLVER PROBLEMA DE SALVAR 2 VEZES
-        /*_statusMessage = syncSuccess 
-          ? 'Dados sincronizados com sucesso' 
-          : 'Dados salvos localmente'; */
-          _statusMessage = syncSuccess 
-          ? 'Dados salvos localmente' 
-          : 'Dados salvos localmente';
+        _statusMessage = 'Dados salvos localmente';
         _isSubmitting = false;
       });
-      
-      _showSubmissionResult(true); // Sempre true porque pelo menos salvou localmente
-      */
     } catch (e, stackTrace) {
       print('❌ Erro na submissão: $e');
       print('📋 Stack trace: $stackTrace');

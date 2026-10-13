@@ -1312,21 +1312,6 @@ class ApiService {
     }
   }
 
-  /// NOVO: Método auxiliar para tratar erros de conexão
-  static String _handleConnectionError(dynamic error) {
-    if (error is SocketException) {
-      return 'Sem conexão com a internet';
-    } else if (error is FormatException) {
-      return 'Erro no formato da resposta do servidor';
-    } else if (error is HttpException) {
-      return 'Erro de comunicação com o servidor';
-    } else if (error.toString().contains('TimeoutException')) {
-      return 'Timeout na conexão com o servidor';
-    } else {
-      return 'Erro de conexão: $error';
-    }
-  }
-
   /// NOVO: Verificar conectividade
   static Future<bool> checkConnectivity() async {
     try {

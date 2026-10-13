@@ -49,16 +49,6 @@ class StatsCards extends StatelessWidget {
     }).length;
   }
 
-  /// Conta quantos questionários estão pendentes de sincronização
-  /// (você pode ajustar esta lógica conforme sua necessidade)
-  int _getPendingSyncCount() {
-    // Exemplo: considerando questionários com status diferente de 'active' como pendentes
-    // Ajuste conforme sua lógica de negócio
-    return questionnaires.where((questionnaire) {
-      return questionnaire.status != 'active';
-    }).length;
-  }
-
   Widget _buildStatCard(String number, String label, Color borderColor) {
     return Container(
       padding: const EdgeInsets.all(20),

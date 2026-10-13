@@ -97,8 +97,7 @@ class _ConsentScreenState extends State<ConsentScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    widget.questionnaire.description ?? 
-                                    'Esta pesquisa tem como objetivo coletar informações sobre práticas ambientais, sociais e de governança. Seus dados serão tratados de forma confidencial e utilizados apenas para fins estatísticos.',
+                                    widget.questionnaire.description,
                                     style: const TextStyle(
                                       fontSize: 14,
                                       color: Color(0xFF23345F),

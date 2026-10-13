@@ -21,8 +21,6 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
   List<MapLocationData> _locationData = [];
   List<ApplicatorStats> _applicatorsStats = [];
   bool _mapLoading = false;
-  bool _hasError = false;
-  String _errorMessage = '';
   String? _selectedState;
   bool _mapInitialized = false;
   bool _showDataTable = false;
@@ -67,8 +65,6 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
   void _loadData() async {
     setState(() {
       _mapLoading = true;
-      _hasError = false;
-      _errorMessage = '';
     });
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -117,22 +113,11 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
         });
         
         print('✅ ${_locationData.length} localizações válidas carregadas');
-        
-        if (_locationData.isEmpty) {
-          setState(() {
-            _hasError = true;
-            _errorMessage = 'Nenhuma localização encontrada para o período selecionado';
-          });
-        }
       } else {
         throw Exception(response['message'] ?? 'Dados não encontrados');
       }
     } catch (e) {
       print('❌ Erro ao carregar dados de localização: $e');
-      setState(() {
-        _hasError = true;
-        _errorMessage = 'Erro ao carregar dados de localização: $e';
-      });
     }
   }
 
@@ -183,21 +168,6 @@ class _BrazilMapScreenState extends State<BrazilMapScreen> {
       default:
         return now.subtract(const Duration(days: 30)).toIso8601String().split('T')[0];
     }
-  }
-
-  void _onStateSelected(String stateName, String stateCode) {
-    setState(() {
-      _selectedState = stateCode;
-    });
-    _loadData();
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Estado selecionado: $stateName'),
-        backgroundColor: const Color(0xFF8FAE5D),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   void _centerOnBrazil() {

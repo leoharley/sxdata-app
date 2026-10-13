@@ -372,12 +372,11 @@ class QuestionAnalysis {
       // Se ainda for 0, calcular manualmente
       if (responseRate == 0.0) {
         int validResponses = 0;
-        int emptyResponses = 0;
-        
+
         for (var data in statisticsData) {
           String label = data['label']?.toString().toLowerCase() ?? '';
           if (label.contains('vazias') || label.contains('empty')) {
-            emptyResponses += _parseToInt(data['count']);
+            continue; // respostas vazias não contam
           } else if (label.contains('preenchidas') || label.contains('filled') || 
                      data['option_text'] != null) {
             validResponses += _parseToInt(data['count']);

@@ -11,7 +11,6 @@ import 'dart:convert';
 import 'package:excel/excel.dart' as excel;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'dart:math' as math;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
@@ -26,7 +25,6 @@ class QuestionAnalysisScreen extends StatefulWidget {
 
 class _QuestionAnalysisScreenState extends State<QuestionAnalysisScreen> {
   AnalysisFilters _currentFilters = AnalysisFilters();
-  bool _showExportOptions = false;
   List<User> _applicators = [];
   bool _loadingApplicators = false;
 
@@ -188,17 +186,7 @@ class _QuestionAnalysisScreenState extends State<QuestionAnalysisScreen> {
     );
   }
 
-  void _showExportMenu() {
-    setState(() {
-      _showExportOptions = !_showExportOptions;
-    });
-  }
-
   Future<void> _exportData(String format) async {
-  setState(() {
-    _showExportOptions = false;
-  });
-
   // Para web, mostrar diálogo de opções ANTES de gerar o arquivo
   if (kIsWeb) {
     await _exportDataWeb(format);
@@ -219,7 +207,6 @@ class _QuestionAnalysisScreenState extends State<QuestionAnalysisScreen> {
 
     final provider = Provider.of<QuestionAnalysisProvider>(context, listen: false);
 
-    String fileName;
     String filePath;
 
     if (provider.selectedQuestionnaireDetail != null) {
@@ -498,8 +485,6 @@ Future<String> _generateExcelDetailedReport(QuestionnaireDetail detail) async {
 
   final resultadosSheet = excelFile['Resultados'];
   excelFile.setDefaultSheet('Resultados');
-
-  final exportDate = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
 
   // PASSO 1: Extrair todas as questões únicas
   final allQuestions = await _extractAllQuestionsFromAPI(detail.id);
@@ -792,145 +777,6 @@ Future<Map<int, Map<String, dynamic>>> _extractAllQuestionsFromAPI(int questionn
   }
 }
 
-List<String> _mapResponseToDynamicFormat(Map<String, dynamic> responseData, Map<int, Map<String, dynamic>> allQuestions, String exportDate) {
-  // Dados fixos na mesma ordem do PHP
-  final fixedData = [
-    responseData['questionnaire_title'] ?? '',
-    responseData['applied_by_name'] ?? '',
-    _formatDate(responseData['completed_at']),
-    responseData['latitude']?.toString() ?? '',
-    responseData['longitude']?.toString() ?? '',
-    responseData['location_name'] ?? '',
-    responseData['consent_given'] == true ? 'SIM' : 'NÃO',
-    (responseData['sync_status'] ?? 'UNKNOWN').toString().toUpperCase(),
-    _formatDateTime(responseData['started_at']),
-    _formatDateTime(responseData['completed_at']),
-    responseData['photo_path'] != null && responseData['photo_path'].toString().isNotEmpty ? 'SIM' : 'NÃO',
-    '${responseData['id']}-${DateTime.now().millisecondsSinceEpoch}'
-  ];
-  
-  // Dados dinâmicos das perguntas (simulando respostas)
-  final questionData = <String>[];
-  for (final question in allQuestions.values) {
-    // Simular resposta para cada questão
-    final mockAnswer = _generateMockAnswer(question['type'], question['id']);
-    questionData.add(mockAnswer);
-  }
-  
-  return [...fixedData, ...questionData];
-}
-
-String _formatDateTime(String? dateTimeString) {
-  if (dateTimeString == null || dateTimeString.isEmpty) return '';
-  try {
-    final dateTime = DateTime.parse(dateTimeString);
-    return DateFormat('dd/MM/yyyy HH:mm').format(dateTime);
-  } catch (e) {
-    return dateTimeString;
-  }
-}
-
-List<String> _mapGeneralResponseData(Map<String, dynamic> responseData, String exportDate) {
-  return [
-    responseData['questionnaire_title'] ?? '',
-    responseData['applied_by_name'] ?? '',
-    _formatDate(responseData['completed_at']),
-    responseData['latitude']?.toString() ?? '',
-    responseData['longitude']?.toString() ?? '',
-    responseData['location_name'] ?? '',
-    responseData['consent_given'] == true ? 'SIM' : 'NÃO',
-    (responseData['sync_status'] ?? 'SYNCED').toString().toUpperCase(),
-    _formatDateTime(responseData['started_at']),
-    _formatDateTime(responseData['completed_at']),
-    responseData['photo_path'] != null && responseData['photo_path'].toString().isNotEmpty ? 'SIM' : 'NÃO',
-    '${responseData['id']}-${DateTime.now().millisecondsSinceEpoch}',
-    // Colunas adicionais comuns
-    responseData['respondent_name'] ?? 'Não informado',
-    responseData['respondent_email'] ?? '',
-    responseData['age']?.toString() ?? '',
-    responseData['gender'] ?? '',
-    responseData['observations'] ?? ''
-  ];
-}
-
-// Função para gerar dados mock de respostas
-List<Map<String, dynamic>> _generateMockResponseData(QuestionnaireDetail detail, Map<int, Map<String, dynamic>> allQuestions) {
-  final mockData = <Map<String, dynamic>>[];
-  
-  // Gerar algumas respostas simuladas
-  for (int i = 1; i <= (detail.totalResponses > 0 ? detail.totalResponses : 3); i++) {
-    mockData.add({
-      'id': i,
-      'questionnaire_title': detail.title,
-      'applied_by_name': 'Aplicador ${i}',
-      'completed_at': DateTime.now().subtract(Duration(days: i)).toIso8601String(),
-      'latitude': -15.7942 + (i * 0.001), 
-      'longitude': -47.8822 + (i * 0.001),
-      'location_name': 'Localização ${i}, Brasília-DF',
-      'consent_given': i % 2 == 0, // Alterna SIM/NÃO
-      'sync_status': i % 3 == 0 ? 'PENDING' : 'SYNCED',
-      'started_at': DateTime.now().subtract(Duration(days: i, hours: 1)).toIso8601String(),
-      'photo_path': i % 2 == 0 ? 'photo_${i}.jpg' : null,
-    });
-  }
-  
-  return mockData;
-}
-
-List<Map<String, dynamic>> _generateMockGeneralData(List<QuestionnaireAnalysis> questionnaires) {
-  final mockData = <Map<String, dynamic>>[];
-  
-  for (int q = 0; q < questionnaires.length; q++) {
-    final questionnaire = questionnaires[q];
-    // Gerar algumas respostas para cada questionário
-    for (int i = 1; i <= (questionnaire.totalResponses > 0 ? math.min(questionnaire.totalResponses, 5) : 2); i++) {
-      mockData.add({
-        'id': (q * 100) + i,
-        'questionnaire_title': questionnaire.title,
-        'applied_by_name': 'Aplicador ${(q + 1)}-${i}',
-        'completed_at': DateTime.now().subtract(Duration(days: q + i)).toIso8601String(),
-        'latitude': -15.7942 + ((q + i) * 0.001),
-        'longitude': -47.8822 + ((q + i) * 0.001),
-        'location_name': 'Localização ${q + 1}-${i}, Brasília-DF',
-        'consent_given': (q + i) % 2 == 0,
-        'sync_status': (q + i) % 3 == 0 ? 'PENDING' : 'SYNCED',
-        'started_at': DateTime.now().subtract(Duration(days: q + i, hours: 1)).toIso8601String(),
-        'photo_path': (q + i) % 2 == 0 ? 'photo_${q}_${i}.jpg' : null,
-        'respondent_name': 'Respondente ${q + 1}-${i}',
-        'respondent_email': 'respondente${q}${i}@email.com',
-        'age': 20 + ((q + i) % 50),
-        'gender': (q + i) % 2 == 0 ? 'Feminino' : 'Masculino',
-        'observations': i % 3 == 0 ? 'Observação importante ${q + 1}-${i}' : ''
-      });
-    }
-  }
-  
-  return mockData;
-}
-
-// Função para gerar resposta mock baseada no tipo de questão
-String _generateMockAnswer(String questionType, int questionId) {
-  switch (questionType) {
-    case 'radio':
-      final options = ['Opção A', 'Opção B', 'Opção C'];
-      return options[questionId % options.length];
-    case 'checkbox':
-      return 'Opção 1, Opção 2';
-    case 'text':
-    case 'textarea':
-      return 'Resposta de texto para questão $questionId';
-    case 'number':
-      return (questionId * 10).toString();
-    case 'date':
-      return DateFormat('dd/MM/yyyy').format(DateTime.now().subtract(Duration(days: questionId)));
-    case 'datetime':
-      return DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now().subtract(Duration(days: questionId)));
-    default:
-      return 'Resposta $questionId';
-  }
-}
-
-// Funções auxiliares para formatação (compatíveis com PHP)
 String _formatDate(String? dateString) {
   if (dateString == null || dateString.isEmpty) return '';
   try {
@@ -1096,22 +942,6 @@ Future<Map<int, Map<String, dynamic>>> _extractAllQuestionsFromMultipleQuestionn
   for (final questionnaire in questionnaires) {
     final questions = await _extractAllQuestionsFromAPI(questionnaire.id);
     allQuestions.addAll(questions);
-  }
-  
-  return allQuestions;
-}
-
-Map<int, Map<String, dynamic>> _extractAllQuestionsFromDetail(QuestionnaireDetail detail) {
-  final allQuestions = <int, Map<String, dynamic>>{};
-  
-  for (int i = 0; i < detail.questions.length; i++) {
-    final question = detail.questions[i];
-    allQuestions[question.id] = {
-      'id': question.id,
-      'text': question.text,
-      'type': question.type,
-      'order_index': i
-    };
   }
   
   return allQuestions;
